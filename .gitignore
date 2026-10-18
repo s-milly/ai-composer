@@ -3,3 +3,5 @@ data/*.pt
 data/chorales.pkl
 __pycache__/
 data/*.log
+data/songs.pkl
+data/*_metrics.json

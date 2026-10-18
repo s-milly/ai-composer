@@ -1,42 +1,50 @@
 # AI Composer
 
-Describe a song ("a slow, sad piano song for a rainy night") and two models turn it into music: one reads the description, the other writes a new four-part piece note by note, and a band plays it on a stage where each player's spotlight follows their part. The Song Maker tab lets you write your own song on a note grid with no AI involved.
+Describe a song ("a loud, hype rock walk-up song", "chill late night jazz with a saxophone") and AI writes it: one model reads the description, a chord model writes a progression in that genre, a melody model writes a tune over the chords, and a band plays it on a stage where each player's spotlight follows their part. The Song Maker tab lets you write your own song on a note grid with no AI involved.
 
 Live page: https://s-milly.github.io/ai-composer/
 
 ## How it works
 
-**Description reader** (`site/js/reader.js`)
-- Words that name a style, mood, speed, instrument, key, length or tempo are read as-is.
-- Everything else goes to linear classifiers (style: 10 choices, mood: 3, speed: 3) trained on the 5,521 musician-written descriptions in MusicCaps, using averaged GloVe word vectors plus a learned weight for each word.
-- `scripts/reader_labels.py` turns the MusicCaps tags into labels; `scripts/reader_train.py 40000 eval` scores the reader on 20% of clips held out of training, and `scripts/reader_train.py 40000 final` exports per-word scores to `site/reader.bin`.
+**Description reader** (`site/js/reader.js`): words that name a style, mood, speed, instrument, key or length are read as-is; everything else goes to linear classifiers on averaged GloVe word vectors, trained on the 5,521 musician-written MusicCaps descriptions (`scripts/reader_labels.py`, `scripts/reader_train.py`).
 
-**Composer** (`site/js/composer.js`)
-- A 2-layer GRU (PyTorch) trained on 306 Bach chorales from the music21 corpus, run by hand in JavaScript from 8-bit weights.
-- `scripts/prepare.py`, `scripts/train.py eval|final`, `scripts/export.py`, `scripts/evaluate.py`.
+**Training data** (`scripts/prepare_genres.py` writes `data/songs.pkl`): melodies with chords, moved to C major or A minor, on a sixteenth-note grid.
+- pop: POP909 (909 songs) and the CoCoPops Billboard subset
+- rock: the CoCoPops Rolling Stone 200
+- folk: the Nottingham Music Database (Jukedeck's cleaned version)
+- classical: Bach chorales and Haydn, Mozart and Beethoven string quartets from the music21 corpus
+- jazz chord changes: iReal Pro lead sheets of about 1,200 standards from the parkR package
+- jazz melodies: the Weimar Jazz Database, if `data/raw/wjazzd/wjazzd.db` is present
 
-**Band** (`site/js/arrange.js`, `site/js/audio.js`, `site/js/stage.js`)
-- Each of the 10 styles sets the band, a speed range, a drum beat and how each part is played (held, repeated eighth notes, arpeggios, jazz comping and walking bass, strumming, oom-pah). These are fixed rules.
-- Instruments are FluidR3 soundfont recordings (`scripts/fetch_samples.py`); drums are synthesized in the browser.
+**Chord model** (`scripts/train_chords.py` -> `site/chords.*`): a GRU that writes one chord per half bar, conditioned on genre, major or minor and the position in the phrase.
+
+**Melody model** (`scripts/train_melody.py` -> `site/melody.*`): a 2-layer GRU that writes one sixteenth note at a time, conditioned on genre, the current and next chord, the beat, the bar in the phrase, major or minor and how busy the melody should be. Genres are sampled equally in training.
+
+**Song writer** (`site/js/writer.js`): phrases in A A', A B A' or A A' B A'' form; the answering phrase repeats the first three bars and comes home; the song ends on the home note.
+
+**Band** (`site/js/arrange.js`, `site/js/audio.js`, `site/js/stage.js`): each of the 10 styles sets the band, a speed range, a drum beat and how each part plays the chords (pads, arpeggios, stabs, power chords, strumming, fingerpicking, jazz comping over a walking bass, march oom-pah). Instruments are FluidR3 soundfont recordings (`scripts/fetch_samples.py`); drums are synthesized in the browser.
 
 **Song Maker** (`site/js/maker.js`): a note grid for each part plus a drum grid, saved in the browser, with MIDI export (`site/js/midi.js`).
 
 ## Run it
 
 ```
-pip install music21 torch scikit-learn pandas
-python scripts/prepare.py
-python scripts/train.py eval 60 && python scripts/train.py final 60
-python scripts/export.py final && python scripts/evaluate.py final
-# reader: needs data/raw/musiccaps/musiccaps-public.csv and data/raw/glove/g100.gz (glove-wiki-gigaword-100)
-python scripts/reader_train.py 40000 eval && python scripts/reader_train.py 40000 final
-python scripts/build_page_data.py
+pip install music21 torch scikit-learn pandas pretty_midi pyreadr
+python scripts/prepare.py            # Bach chorales from the music21 corpus
+python scripts/prepare_genres.py     # needs the raw datasets in data/raw (see the script)
+python scripts/train_chords.py 40
+python scripts/train_melody.py final 14
+python scripts/reader_train.py 40000 final
 python -m http.server
 ```
 
 ## Credits
 
-- Descriptions: [MusicCaps](https://research.google/resources/datasets/musiccaps/) by Google (Agostinelli et al., 2023), CC BY-SA 4.0. The description reader files (`site/reader.bin`, `site/reader.json`) are derived from it and shared under CC BY-SA 4.0.
-- Word vectors: [GloVe](https://nlp.stanford.edu/projects/glove/) (Pennington, Socher and Manning, 2014), public domain (PDDL).
-- Bach chorales from the [music21](https://www.music21.org/) corpus. The chorales are in the public domain.
-- Instrument sounds: FluidR3 General MIDI soundfont by Frank Wen, rendered by [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts), CC BY 3.0. Every third note kept, trimmed to 3.5 seconds and converted to mono.
+- POP909 (Wang et al., ISMIR 2020), MIT license.
+- CoCoPops (Arthur and Condit-Schultz, ISMIR 2023), including the Rolling Stone corpus of de Clercq and Temperley and the McGill Billboard dataset of Burgoyne, Wild and Fujinaga.
+- Nottingham Music Database, cleaned by Jukedeck.
+- music21 corpus (Bach chorales, string quartets by Haydn, Mozart and Beethoven), public domain music.
+- iReal Pro chord changes from parkR by Klaus Frieler, MIT license.
+- MusicCaps by Google (Agostinelli et al., 2023), CC BY-SA 4.0. The description reader files (`site/reader.bin`, `site/reader.json`) are derived from it and shared under CC BY-SA 4.0.
+- GloVe word vectors (Pennington, Socher and Manning, 2014), public domain.
+- Instrument sounds: FluidR3 General MIDI soundfont by Frank Wen, rendered by gleitz/midi-js-soundfonts, CC BY 3.0. Every third note kept, trimmed to 3.5 seconds and converted to mono.

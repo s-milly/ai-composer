@@ -186,7 +186,6 @@ svg text { font-family: var(--font-body); }
 .mk-hint { position: absolute; left: 70px; top: 50%; transform: translateY(-50%); margin: 0; background: var(--surface); border: 1px dashed var(--axis); border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--ink-2); max-width: 340px; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.08); }
 
 /* Results */
-#rules, #reader-chart { display: block; width: 100%; height: auto; overflow: visible; }
 details { font-size: 14px; color: var(--ink-2); }
 summary { cursor: pointer; color: var(--ink-2); font-weight: 500; }
 table { border-collapse: collapse; margin-top: 10px; font-size: 13.5px; font-variant-numeric: tabular-nums; width: 100%; max-width: 640px; }

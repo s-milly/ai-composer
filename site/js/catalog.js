@@ -37,31 +37,31 @@ export const PARTS = [
 ];
 export const DRUM_PART = { name: "Drums", color: "var(--p4)" };
 
-// How each part is played in a style. The composer writes four parts in long notes; these turn
-// them into a band part: "as" plays them as written, "pulse8" repeats the ringing note on every
-// eighth note, "arp" breaks the chord into an eighth-note pattern, and so on (see arrange.js).
-// tempo: [slow, medium, fast] in beats per minute.
+// Each style says which genre the chords and melody are written in (the models were trained on
+// pop, rock, jazz, classical and folk music), how busy the melody is compared with the speed
+// (-1 sparser, +1 busier), the usual band, how each part plays the chords (see arrange.js),
+// the drum beat and a speed range: tempo is [slow, medium, fast] in beats per minute.
 export const STYLES = {
-  classical: { name: "Classical", band: ["violin", "violin", "viola", "cello"], play: ["as", "as", "as", "as"],
-    drums: null, tempo: [64, 80, 96], swing: 0 },
-  ballad: { name: "Ballad", band: ["acoustic_grand_piano", "string_ensemble_1", "acoustic_grand_piano", "cello"],
-    play: ["as", "pad", "arp", "as"], drums: null, tempo: [58, 70, 84], swing: 0 },
-  pop: { name: "Pop and dance", band: ["lead_2_sawtooth", "electric_piano_1", "pad_2_warm", "synth_bass_1"],
-    play: ["as", "stab", "pad", "root8"], drums: "pop", tempo: [96, 112, 126], swing: 0 },
-  rock: { name: "Rock", band: ["overdriven_guitar", "electric_guitar_clean", "overdriven_guitar", "electric_bass_pick"],
-    play: ["as", "pulse8", "pulse8", "root8"], drums: "rock", tempo: [96, 120, 144], swing: 0 },
-  jazz: { name: "Jazz", band: ["alto_sax", "vibraphone", "electric_piano_1", "acoustic_bass"],
-    play: ["as", "comp", "comp", "walk"], drums: "jazz", tempo: [76, 104, 138], swing: 0.66 },
-  folk: { name: "Folk and country", band: ["harmonica", "acoustic_guitar_steel", "acoustic_guitar_steel", "acoustic_bass"],
-    play: ["as", "strum", "strum", "oom"], drums: "folk", tempo: [80, 100, 120], swing: 0 },
-  march: { name: "March", band: ["trumpet", "french_horn", "trombone", "tuba"],
-    play: ["as", "as", "pah", "oom"], drums: "march", tempo: [96, 112, 124], swing: 0 },
-  cinematic: { name: "Movie score", band: ["french_horn", "string_ensemble_1", "tremolo_strings", "contrabass"],
-    play: ["as", "pad", "as", "root8"], drums: "cinematic", tempo: [66, 88, 112], swing: 0 },
-  lullaby: { name: "Lullaby", band: ["music_box", "celesta", "orchestral_harp", "cello"],
-    play: ["as", "pad", "arp", "as"], drums: null, tempo: [50, 60, 72], swing: 0 },
-  spooky: { name: "Spooky", band: ["celesta", "church_organ", "pizzicato_strings", "contrabass"],
-    play: ["as", "pad", "pulse8", "as"], drums: null, tempo: [56, 72, 92], swing: 0, minor: true },
+  classical: { name: "Classical", genre: "classical", dens: 0, band: ["violin", "violin", "viola", "cello"],
+    play: ["melody", "upper", "lower", "root"], drums: null, tempo: [66, 84, 104], swing: 0 },
+  ballad: { name: "Ballad", genre: "pop", dens: -1, band: ["acoustic_grand_piano", "string_ensemble_1", "acoustic_grand_piano", "cello"],
+    play: ["melody", "pad", "arp", "root"], drums: null, tempo: [60, 72, 84], swing: 0 },
+  pop: { name: "Pop and dance", genre: "pop", dens: 0, band: ["lead_2_sawtooth", "electric_piano_1", "pad_2_warm", "synth_bass_1"],
+    play: ["melody", "stab", "pad", "root8"], drums: "pop", tempo: [96, 112, 126], swing: 0 },
+  rock: { name: "Rock", genre: "rock", dens: 0, band: ["overdriven_guitar", "electric_guitar_clean", "overdriven_guitar", "electric_bass_pick"],
+    play: ["melody", "strum", "power8", "root8"], drums: "rock", tempo: [96, 120, 144], swing: 0 },
+  jazz: { name: "Jazz", genre: "jazz", dens: 1, band: ["alto_sax", "vibraphone", "electric_piano_1", "acoustic_bass"],
+    play: ["melody", "comp", "comp2", "walk"], drums: "jazz", tempo: [76, 112, 152], swing: 0.66 },
+  folk: { name: "Folk and country", genre: "folk", dens: 0, band: ["violin", "acoustic_guitar_steel", "banjo", "acoustic_bass"],
+    play: ["melody", "strum", "pick", "rootfifth"], drums: "folk", tempo: [80, 100, 120], swing: 0 },
+  march: { name: "March", genre: "folk", dens: 0, band: ["trumpet", "french_horn", "trombone", "tuba"],
+    play: ["melody", "upper", "pah", "oom"], drums: "march", tempo: [96, 112, 124], swing: 0 },
+  cinematic: { name: "Movie score", genre: "classical", dens: -1, band: ["french_horn", "string_ensemble_1", "orchestral_harp", "contrabass"],
+    play: ["melody", "pad", "arp", "root8"], drums: "cinematic", tempo: [66, 88, 112], swing: 0 },
+  lullaby: { name: "Lullaby", genre: "pop", dens: -1, band: ["music_box", "string_ensemble_1", "orchestral_harp", "cello"],
+    play: ["melody", "pad", "arp", "root"], drums: null, tempo: [50, 60, 72], swing: 0 },
+  spooky: { name: "Spooky", genre: "classical", dens: -1, band: ["celesta", "church_organ", "pizzicato_strings", "contrabass"],
+    play: ["melody", "pad", "arp", "root"], drums: null, tempo: [56, 72, 92], swing: 0, minor: true },
 };
 export const STYLE_ORDER = ["classical", "ballad", "pop", "rock", "jazz", "folk", "march", "cinematic", "lullaby", "spooky"];
 

@@ -1,5 +1,5 @@
 import { INSTRUMENTS, INST, PARTS, DRUM_PART, STYLES, STYLE_ORDER, KEYS, BEAT_NAMES } from "./catalog.js";
-import { loadComposer, compose, toParts } from "./composer.js";
+import { loadWriter, writeSong, rewriteMelody, melodyGenres } from "./writer.js";
 import { loadReader, readDescription } from "./reader.js";
 import { arrange } from "./arrange.js";
 import * as audio from "./audio.js";
@@ -7,7 +7,6 @@ import { mountStage, setBand, light } from "./stage.js";
 import { mountMaker, makerSong, loadSong, selectTrack, draw as drawMaker, playhead as makerHead, mk } from "./maker.js";
 import { drawRoll, rollHead, rollTip } from "./roll.js";
 import { downloadMidi } from "./midi.js";
-import { drawGrouped } from "./charts.js";
 
 const $ = id => document.getElementById(id);
 const state = { tab: "ai", ai: null, read: null, playing: null };
@@ -96,12 +95,20 @@ async function composeFrom(text) {
   await runCompose(settings, null);
 }
 
-async function runCompose(settings, melody) {
+// Which genre the models write in for a style, and how busy the melody is (0 to 2).
+function writing(s) {
+  const S = STYLES[s.style], trained = melodyGenres();
+  const dens = Math.max(0, Math.min(2, ["slow", "medium", "fast"].indexOf(s.speed) + S.dens));
+  return { genre: S.genre, melodyGenre: trained.includes(S.genre) ? S.genre : "pop", minor: s.minor, bars: s.bars, dens, temp: s.creativity };
+}
+
+async function runCompose(settings, keepChords) {
   if (state.playing) stopPlay();
   busy(true);
   setStatus("Writing the song…");
-  const grid = await compose(settings.bars, settings.minor ? 1 : 0, settings.creativity, melody, msg => setStatus(`${msg}…`));
-  state.ai = { settings: { ...settings }, grid };
+  const w = writing(settings), onProgress = msg => setStatus(`${msg}…`);
+  const written = keepChords ? await rewriteMelody(state.ai.written, w) : await writeSong({ ...w, onProgress });
+  state.ai = { settings: { ...settings }, written };
   $("heard").hidden = false; $("roll-wrap").hidden = false;
   rebuild();
   busy(false);
@@ -112,9 +119,8 @@ async function runCompose(settings, melody) {
 }
 
 function rebuild() {
-  const { settings: s, grid } = state.ai;
-  const written = toParts(grid, s.key, s.minor);
-  state.ai.song = arrange(written, { steps: grid.length, style: s.style, band: s.band, drums: s.drums, tempo: s.tempo, key: s.key, minor: s.minor });
+  const { settings: s, written } = state.ai;
+  state.ai.song = arrange(written, { style: s.style, band: s.band, drums: s.drums, tempo: s.tempo, key: s.key, minor: s.minor });
   showBand(s.band, !!s.drums);
   drawRoll($("roll"), $("roll-scroll"), state.ai.song);
   $("roll-title").textContent = `The notes · ${KEYS[s.key]} ${s.minor ? "minor" : "major"} · ${s.bars} bars`;
@@ -204,42 +210,12 @@ function setTab(tab) {
   stageForTab(); refreshPlayable();
 }
 
-/* ---------- Results ---------- */
-const pct = v => `${(v * 100).toFixed(1)}%`;
-function fillStats(s) {
-  const r = s.reader;
-  $("facts").innerHTML = [
-    [s.chorales, "Bach chorales the composer learned from"],
-    ["5,521", "descriptions by musicians the reader learned from"],
-    [INSTRUMENTS.length, "instruments to choose from, no vocals"],
-    [STYLE_ORDER.length, "band styles, from rock to lullaby"],
-  ].map(([b, t]) => `<li><b>${b}</b><span>${t}</span></li>`).join("");
-
-  const readerRows = [["style", "Style (10 choices)"], ["mood", "Mood (3 choices)"], ["speed", "Speed (3 choices)"]]
-    .map(([k, label]) => ({ label, model: r[k].accuracy, random: r[k].baseline, base: r[k].baseline_class }));
-  $("reader-read").textContent = `The reader was tested on ${r.test_clips.toLocaleString()} MusicCaps clips it never trained on, using the musician's full written description of each one. It picked the right style ${pct(r.style.accuracy)} of the time, against ${pct(r.style.baseline)} for always guessing pop, and the right mood ${pct(r.mood.accuracy)} and speed ${pct(r.speed.accuracy)} of the time. Only clips whose tags gave a clear answer were scored. On this page, words that name a style, mood or speed outright are read directly, so these scores cover the harder case where the model has to work it out.`;
-  const readerSeries = [["model", "The description reader", "var(--model)"], ["random", "Always guessing the most common answer", "var(--random)"]];
-  drawGrouped($("reader-chart"), $("reader-wrap"), $("reader-tip"), readerRows, readerSeries);
-  $("reader-table").innerHTML = `<thead><tr><th>Question</th><th>Reader</th><th>Most common answer</th><th>Clips scored</th></tr></thead><tbody>`
-    + [["style", "Style"], ["mood", "Mood"], ["speed", "Speed"]].map(([k, n]) => `<tr><td>${n}</td><td>${pct(r[k].accuracy)}</td><td>${pct(r[k].baseline)} (${r[k].baseline_class})</td><td>${r[k].n}</td></tr>`).join("") + "</tbody>";
-
-  const rr = Object.fromEntries(s.rules.map(x => [x.id, x]));
-  $("rules-read").textContent = `${s.songs} songs from the composer (8 bars each, half major and half minor, creativity ${s.temperature}) were scored on four checks a music theory class would use, next to the ${s.chorales} chorales it learned from and ${s.songs} songs of random notes with Bach-like rhythms. Higher is better on every check. The model stays in the key and moves its melody by step (one or two half steps) as often as Bach does, and it lands on a standard chord on ${pct(rr.chords.model)} of beats, against ${pct(rr.chords.bach)} for Bach. It ends on the home chord more often than Bach (${pct(rr.cadence.model)} against ${pct(rr.cadence.bach)}), but that check has help: with the ending rewrite turned off, only ${pct(s.cadence_no_rewrite)} of its songs end there. These checks score the four parts the composer writes, before the band arrangement.`;
-  const rulesSeries = [["bach", "Real Bach chorales", "var(--bach)"], ["model", "Songs from this model", "var(--model)"], ["random", "Random notes", "var(--random)"]];
-  drawGrouped($("rules"), $("rules-wrap"), $("rules-tip"), s.rules, rulesSeries);
-  $("rules-table").innerHTML = `<thead><tr><th>Check</th>${rulesSeries.map(([, n]) => `<th>${n}</th>`).join("")}</tr></thead><tbody>`
-    + s.rules.map(x => `<tr><td>${x.label}</td>${rulesSeries.map(([k]) => `<td>${pct(x[k])}</td>`).join("")}</tr>`).join("") + "</tbody>";
-  $("method").innerHTML = s.method.map(([b, t]) => `<li><b>${b}</b> ${t}</li>`).join("");
-  let w = innerWidth;
-  addEventListener("resize", () => {
-    if (innerWidth === w) return; w = innerWidth;
-    drawGrouped($("reader-chart"), $("reader-wrap"), $("reader-tip"), readerRows, readerSeries);
-    drawGrouped($("rules"), $("rules-wrap"), $("rules-tip"), s.rules, rulesSeries);
-    if (state.ai) drawRoll($("roll"), $("roll-scroll"), state.ai.song);
-    stageForTab();
-    if (state.tab === "mk") drawMaker();
-  });
-}
+const FACTS = [
+  ["1,987", "songs the composer learned from: pop, rock, folk and classical"],
+  ["1,098", "jazz standards it learned chord changes from"],
+  ["5,521", "descriptions by musicians the reader learned from"],
+  [INSTRUMENTS.length, "instruments to choose from, no vocals"],
+];
 
 /* ---------- Start ---------- */
 function init() {
@@ -257,7 +233,7 @@ function init() {
   });
   $("prompt").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask").requestSubmit(); } });
   $("again").addEventListener("click", () => runCompose(state.ai.settings, null));
-  $("reharm").addEventListener("click", () => runCompose(state.ai.settings, state.ai.grid.map(c => c[0])));
+  $("reharm").addEventListener("click", () => runCompose(state.ai.settings, true));
   $("to-maker").addEventListener("click", () => { loadSong(state.ai.song); setTab("mk"); $("tab-mk").scrollIntoView({ block: "start", behavior: "smooth" }); });
   $("midi").addEventListener("click", () => { const s = state.ai.settings; downloadMidi(state.ai.song, `ai-composer-${STYLES[s.style].name.split(" ")[0].toLowerCase()}-${KEYS[s.key].replace("#", "sharp")}-${s.minor ? "minor" : "major"}.mid`); });
   $("mk-midi").addEventListener("click", () => downloadMidi(makerSong(), "my-song.mid"));
@@ -271,8 +247,15 @@ function init() {
   $("roll").addEventListener("pointermove", e => rollTip(e, state.ai && state.ai.song, $("roll-tip"), $("roll-scroll").parentElement));
   $("roll").addEventListener("pointerleave", () => $("roll-tip").classList.remove("on"));
 
-  fetch("site/stats.json").then(r => r.json()).then(fillStats);
-  Promise.all([loadComposer(), loadReader()]).then(() => {
+  $("facts").innerHTML = FACTS.map(([b, t]) => `<li><b>${b}</b><span>${t}</span></li>`).join("");
+  let w = innerWidth;
+  addEventListener("resize", () => {
+    if (innerWidth === w) return; w = innerWidth;
+    if (state.ai) drawRoll($("roll"), $("roll-scroll"), state.ai.song);
+    if (state.tab === "mk") drawMaker();
+    stageForTab();
+  });
+  Promise.all([loadWriter(), loadReader()]).then(() => {
     $("compose").disabled = false;
     setStatus("Describe a song, or pick an example.");
     refreshPlayable();
