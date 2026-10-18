@@ -8,7 +8,11 @@ NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
 INSTRUMENTS = ["acoustic_grand_piano", "electric_piano_1", "harpsichord", "church_organ", "marimba", "vibraphone",
                "acoustic_guitar_nylon", "orchestral_harp", "violin", "viola", "cello", "contrabass",
                "string_ensemble_1", "pizzicato_strings", "flute", "oboe", "clarinet", "bassoon",
-               "trumpet", "french_horn", "trombone", "tuba", "acoustic_bass", "alto_sax"]
+               "trumpet", "french_horn", "trombone", "tuba", "acoustic_bass", "alto_sax",
+               "electric_guitar_clean", "overdriven_guitar", "acoustic_guitar_steel", "banjo", "electric_bass_finger",
+               "electric_bass_pick", "synth_bass_1", "lead_2_sawtooth", "pad_2_warm", "music_box", "celesta",
+               "xylophone", "glockenspiel", "steel_drums", "harmonica", "accordion", "brass_section", "timpani",
+               "tremolo_strings", "tenor_sax"]
 NOTES = range(31, 91, 3)  # G1 to Gb6 covers every voice after transposing to any key
 
 for inst in INSTRUMENTS:

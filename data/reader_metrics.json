@@ -1,0 +1,28 @@
+{
+ "vocab": 40000,
+ "test_clips": 1142,
+ "style": {
+  "n": 728,
+  "accuracy": 0.6730769230769231,
+  "accuracy_tags": 0.782967032967033,
+  "baseline": 0.3131868131868132,
+  "baseline_class": "pop",
+  "classes": 10
+ },
+ "mood": {
+  "n": 264,
+  "accuracy": 0.8484848484848485,
+  "accuracy_tags": 0.8939393939393939,
+  "baseline": 0.5454545454545454,
+  "baseline_class": "bright",
+  "classes": 3
+ },
+ "speed": {
+  "n": 442,
+  "accuracy": 0.7714932126696833,
+  "accuracy_tags": 0.9253393665158371,
+  "baseline": 0.36877828054298645,
+  "baseline_class": "medium",
+  "classes": 3
+ }
+}
