@@ -1,0 +1,4 @@
+data/raw/
+data/*.pt
+data/chorales.pkl
+__pycache__/
