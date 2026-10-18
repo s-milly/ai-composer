@@ -49,8 +49,8 @@ export function arrange(written, { style, band, drums, tempo, key, minor }) {
   // voicings for every half bar, voice-led
   let hiPrev = null, loPrev = null;
   const vo = slots.map(c => {
-    const hi = voice(c.pcs, hiPrev, 67, c.pcs.length); hiPrev = hi;
-    const lo = voice(c.pcs, loPrev, 58, 3); loPrev = lo;
+    const hi = voice(c.pcs, hiPrev, 63, c.pcs.length); hiPrev = hi;
+    const lo = voice(c.pcs, loPrev, 56, 3); loPrev = lo;
     let bass = 36 + ((c.root - 36) % 12 + 12) % 12; if (bass < 38) bass += 12;
     return { hi, lo, bass, pcs: c.pcs, root: c.root, qual: c.qual };
   });

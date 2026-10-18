@@ -18,7 +18,7 @@ Live page: https://s-milly.github.io/ai-composer/
 
 **Chord model** (`scripts/train_chords.py` -> `site/chords.*`): a GRU that writes one chord per half bar, conditioned on genre, major or minor and the position in the phrase.
 
-**Melody model** (`scripts/train_melody.py` -> `site/melody.*`): a 2-layer GRU that writes one sixteenth note at a time, conditioned on genre, the current and next chord, the beat, the bar in the phrase, major or minor and how busy the melody should be. Genres are sampled equally in training.
+**Melody model** (`scripts/train_melody.py` -> `site/melody.*`): a 2-layer GRU that writes one sixteenth note at a time, conditioned on genre, the current and next chord, the beat, the bar in the phrase, major or minor and how busy the melody should be. Genres are sampled equally in training. The model on the page was trained on 90% of the songs (2,145), with the rest kept aside to check it.
 
 **Song writer** (`site/js/writer.js`): phrases in A A', A B A' or A A' B A'' form; the answering phrase repeats the first three bars and comes home; the song ends on the home note.
 
