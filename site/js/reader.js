@@ -88,7 +88,7 @@ const INSTRUMENT_WORDS = [
   ["vibes", "vibraphone"], ["marimba", "marimba"], ["xylophone", "xylophone"], ["steel drums", "steel_drums"],
   ["steel drum", "steel_drums"], ["steel pan", "steel_drums"],
   ["classical guitar", "acoustic_guitar_nylon"], ["nylon guitar", "acoustic_guitar_nylon"], ["acoustic guitar", "acoustic_guitar_steel"],
-  ["rock guitar", "overdriven_guitar"], ["distorted guitar", "overdriven_guitar"], ["electric guitar", s => (s === "rock" ? "overdriven_guitar" : "electric_guitar_clean")],
+  ["rock guitar", "overdriven_guitar"], ["distorted guitar", "overdriven_guitar"], ["electric guitar", "electric_guitar_clean"],
   ["guitars", GUITAR], ["guitar", GUITAR], ["banjo", "banjo"], ["harp", "orchestral_harp"], ["fiddle", "violin"],
   ["violins", "violin"], ["violin", "violin"], ["viola", "viola"], ["cellos", "cello"], ["cello", "cello"],
   ["double bass", "contrabass"], ["contrabass", "contrabass"], ["upright bass", "acoustic_bass"], ["bass guitar", "electric_bass_finger"],
@@ -100,6 +100,11 @@ const INSTRUMENT_WORDS = [
   ["horn", "french_horn"], ["trombone", "trombone"], ["tuba", "tuba"], ["timpani", "timpani"],
   ["synth pad", "pad_2_warm"], ["synthesizer", "lead_2_sawtooth"], ["synths", "lead_2_sawtooth"], ["synth", "lead_2_sawtooth"],
 ];
+// every instrument's name as the page lists it also works in a description
+for (const i of Object.values(INST)) {
+  const w = i.name.toLowerCase();
+  if (!INSTRUMENT_WORDS.some(([x]) => x === w)) INSTRUMENT_WORDS.push([w, i.id]);
+}
 const BASS_ONLY = new Set(["contrabass", "acoustic_bass", "electric_bass_finger", "electric_bass_pick", "synth_bass_1", "tuba", "timpani"]);
 const LEADS = new Set(["flute", "oboe", "clarinet", "alto_sax", "tenor_sax", "harmonica", "trumpet", "violin", "lead_2_sawtooth", "music_box", "overdriven_guitar", "french_horn", "glockenspiel", "steel_drums", "xylophone", "celesta"]);
 const VOICE_WORDS = ["vocals", "vocal", "singing", "singer", "sing", "voice", "voices", "choir", "lyrics", "rapper"];

@@ -27,6 +27,19 @@ const RAW = [
 ];
 export const INSTRUMENTS = RAW.map(([id, name, prog, icon, decays]) => ({ id, name, prog, icon, decays: !!decays }));
 export const INST = Object.fromEntries(INSTRUMENTS.map(i => [i.id, i]));
+
+// The instrument list on the page, by family: [family, stage icon, instrument ids].
+export const FAMILIES = [
+  ["Keys", "piano", ["acoustic_grand_piano", "electric_piano_1", "harpsichord", "celesta", "church_organ", "accordion"]],
+  ["Bells and mallets", "mallets", ["music_box", "glockenspiel", "vibraphone", "marimba", "xylophone", "steel_drums"]],
+  ["Guitars and harp", "guitar", ["acoustic_guitar_nylon", "acoustic_guitar_steel", "electric_guitar_clean", "overdriven_guitar", "banjo", "orchestral_harp"]],
+  ["Strings", "violin", ["violin", "viola", "cello", "contrabass", "string_ensemble_1", "tremolo_strings", "pizzicato_strings"]],
+  ["Woodwinds", "sax", ["flute", "oboe", "clarinet", "bassoon", "alto_sax", "tenor_sax", "harmonica"]],
+  ["Brass", "trumpet", ["trumpet", "brass_section", "french_horn", "trombone", "tuba"]],
+  ["Bass", "ebass", ["acoustic_bass", "electric_bass_finger", "electric_bass_pick", "synth_bass_1"]],
+  ["Synths", "synth", ["lead_2_sawtooth", "pad_2_warm"]],
+  ["Drums and percussion", "drums", ["drums", "timpani"]],
+];
 export const DRUMS_ID = "drums";
 
 export const PARTS = [

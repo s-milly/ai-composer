@@ -1,9 +1,9 @@
-import { INSTRUMENTS, INST, PARTS, DRUM_PART, STYLES, STYLE_ORDER, KEYS, BEAT_NAMES } from "./catalog.js";
+import { INSTRUMENTS, INST, PARTS, DRUM_PART, STYLES, STYLE_ORDER, KEYS, BEAT_NAMES, FAMILIES } from "./catalog.js";
 import { loadWriter, writeSong, rewriteMelody, melodyGenres } from "./writer.js";
 import { loadReader, readDescription } from "./reader.js";
 import { arrange } from "./arrange.js";
 import * as audio from "./audio.js";
-import { mountStage, setBand, light } from "./stage.js";
+import { mountStage, setBand, light, ICONS } from "./stage.js";
 import { mountMaker, makerSong, loadSong, selectTrack, draw as drawMaker, playhead as makerHead, mk } from "./maker.js";
 import { drawRoll, rollHead, rollTip } from "./roll.js";
 import { downloadMidi } from "./midi.js";
@@ -195,6 +195,57 @@ function mountAdjust() {
   seg("a-mode", v => (s().minor = !!v));
 }
 
+/* ---------- The instrument list ---------- */
+const nameOf = id => (id === "drums" ? "drums" : INST[id].name.toLowerCase());
+const BASSY = new Set(["contrabass", "acoustic_bass", "electric_bass_finger", "electric_bass_pick", "synth_bass_1", "tuba", "bassoon", "timpani", "cello", "trombone"]);
+
+function mountInstruments() {
+  $("inst-count").textContent = INSTRUMENTS.length;
+  $("inst-groups").innerHTML = FAMILIES.map(([fam, icon, ids]) => `<section class="fam">
+      <h3><svg class="fam-ico" viewBox="-10 -20 120 124" aria-hidden="true">${ICONS[icon]}</svg>${fam}</h3>
+      <div class="chips">${ids.map(id => `<button type="button" data-id="${id}" aria-pressed="false">${id === "drums" ? "Drum kit" : INST[id].name}</button>`).join("")}</div>
+    </section>`).join("");
+  $("inst-groups").addEventListener("click", e => {
+    const b = e.target.closest("button[data-id]"); if (!b) return;
+    const id = b.dataset.id;
+    hear(id, b);
+    addToPrompt(nameOf(id));
+    markInstruments();
+  });
+  $("prompt").addEventListener("input", markInstruments);
+}
+
+// a short sample: a rising chord for instruments, a little beat for the drum kit
+async function hear(id, chip) {
+  chip.classList.add("playing");
+  setTimeout(() => chip.classList.remove("playing"), 900);
+  if (id === "drums") { [["kick", 0], ["hat", 150], ["snare", 300], ["hat", 450], ["kick", 600]].forEach(([d, t]) => setTimeout(() => audio.preview("drums", d), t)); return; }
+  try { await audio.loadInstrument(id); } catch (e) { return; }
+  const base = BASSY.has(id) ? 36 : 60;
+  [0, 4, 7, 12].forEach((p, i) => setTimeout(() => audio.preview(id, base + p, i === 3 ? 2 : 0.6), i * 170));
+}
+
+function addToPrompt(name) {
+  const el = $("prompt");
+  let t = el.value.trim().replace(/[.!]+$/, "");
+  if (new RegExp(`\\b${name}\\b`, "i").test(t)) return;
+  if (!t) el.value = `A song with ${name}`;
+  else if (/ with /i.test(t)) {
+    // "with flute and cello" + drums -> "with flute, cello and drums"
+    const at = t.toLowerCase().lastIndexOf(" with "), list = t.slice(at), j = list.lastIndexOf(" and ");
+    el.value = `${t.slice(0, at)}${j >= 0 ? list.slice(0, j) + "," + list.slice(j + 4) : list} and ${name}`;
+  } else el.value = `${t} with ${name}`;
+}
+
+// instruments already in the description show as picked
+function markInstruments() {
+  const t = $("prompt").value.toLowerCase();
+  $("inst-groups").querySelectorAll("button[data-id]").forEach(b => {
+    const n = nameOf(b.dataset.id);
+    b.setAttribute("aria-pressed", String(new RegExp(`\\b${n}\\b`).test(t)));
+  });
+}
+
 /* ---------- Tabs ---------- */
 function setTab(tab) {
   if (state.tab === tab) return;
@@ -222,6 +273,7 @@ function init() {
   mountStage($("stage"), pickPlayer);
   stageForTab();
   mountAdjust();
+  mountInstruments();
   mountMaker($("pane-mk"), { onChange: () => { if (state.tab === "mk") { stageForTab(); refreshPlayable(); } } });
   $("length").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
@@ -233,7 +285,7 @@ function init() {
     }
   });
   $("examples").innerHTML = EXAMPLES.map(t => `<button type="button">${t}</button>`).join("");
-  $("examples").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || $("compose").disabled) return; $("prompt").value = b.textContent; composeFrom(b.textContent); });
+  $("examples").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || $("compose").disabled) return; $("prompt").value = b.textContent; markInstruments(); composeFrom(b.textContent); });
   $("ask").addEventListener("submit", e => {
     e.preventDefault();
     const text = $("prompt").value.trim() || $("prompt").placeholder;
