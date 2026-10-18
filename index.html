@@ -21,6 +21,7 @@
     <div class="tabs" role="tablist" aria-label="Mode">
       <button type="button" role="tab" id="tab-ai" aria-controls="pane-ai" aria-selected="true">Describe a song</button>
       <button type="button" role="tab" id="tab-mk" aria-controls="pane-mk" aria-selected="false" tabindex="-1">Write your own</button>
+      <button type="button" role="tab" id="tab-ab" aria-controls="pane-ab" aria-selected="false" tabindex="-1">About</button>
     </div>
 
     <div class="stage-wrap">
@@ -41,7 +42,19 @@
           <textarea id="prompt" rows="2" maxlength="300" placeholder="A slow, sad piano song for a rainy night"></textarea>
           <button class="btn btn--main" id="compose" type="submit" disabled>Compose</button>
         </div>
-        <div class="chips examples" id="examples" aria-label="Examples"></div>
+        <div class="ask-length">
+          <span class="label" id="len-label">Length</span>
+          <div class="seg seg--len" role="group" aria-labelledby="len-label" id="length">
+            <button type="button" data-v="0" aria-pressed="true">Auto</button>
+            <button type="button" data-v="8" aria-pressed="false">Short <small>8 bars</small></button>
+            <button type="button" data-v="16" aria-pressed="false">Medium <small>16 bars</small></button>
+            <button type="button" data-v="24" aria-pressed="false">Long <small>24 bars</small></button>
+            <button type="button" data-v="32" aria-pressed="false">Extra long <small>32 bars</small></button>
+          </div>
+          <p class="note" id="len-note">Auto follows your description, like "a short song" or "a one minute song". Otherwise it writes 16 bars.</p>
+        </div>
+        <span class="label" style="margin-top:14px">Or try an example</span>
+        <div class="chips" id="examples" aria-label="Examples"></div>
       </form>
 
       <div class="heard" id="heard" hidden>
@@ -62,15 +75,13 @@
             <div class="field"><span class="lab"><label for="a-key">Key</label></span><select id="a-key"></select></div>
             <div class="field"><span class="lab">Mode</span>
               <div class="seg" role="group" aria-label="Mode" id="a-mode"><button type="button" data-v="0">Major</button><button type="button" data-v="1">Minor</button></div></div>
-            <div class="field wide"><span class="lab">Length</span>
-              <div class="seg" role="group" aria-label="Length in bars" id="a-bars"><button type="button" data-v="4">4 bars</button><button type="button" data-v="8">8 bars</button><button type="button" data-v="12">12 bars</button><button type="button" data-v="16">16 bars</button></div></div>
             <div class="field"><span class="lab"><label for="a-tempo">Speed</label><output id="a-tempo-out"></output></span>
               <input type="range" id="a-tempo" min="40" max="180" step="2"><div class="range-ends"><span>Slow</span><span>Fast</span></div></div>
             <div class="field"><span class="lab"><label for="a-temp">Creativity</label><output id="a-temp-out"></output></span>
               <input type="range" id="a-temp" min="0.5" max="1.4" step="0.05"><div class="range-ends"><span>Safe</span><span>Bold</span></div></div>
             <div class="band-grid" id="a-band"></div>
           </div>
-          <p class="note" style="margin-top:12px">Style, band, drums, key and speed change the song right away. Mode, length and creativity apply to the next song, so press New song after changing them.</p>
+          <p class="note" style="margin-top:12px">Style, band, drums, key and speed change the song right away. Mode and creativity apply to the next song, so press New song after changing them.</p>
         </details>
       </div>
 
@@ -106,7 +117,7 @@
       <div class="mk-tools">
         <div class="field"><span class="lab"><label for="mk-key">Key</label></span><select id="mk-key"></select></div>
         <div class="field"><span class="lab">Mode</span><div class="seg" role="group" aria-label="Mode" id="mk-mode"><button type="button" data-v="0">Major</button><button type="button" data-v="1">Minor</button></div></div>
-        <div class="field"><span class="lab">Length</span><div class="seg" role="group" aria-label="Length in bars" id="mk-bars"><button type="button" data-v="4">4</button><button type="button" data-v="8">8</button><button type="button" data-v="12">12</button><button type="button" data-v="16">16</button></div></div>
+        <div class="field"><span class="lab">Length</span><div class="seg" role="group" aria-label="Length in bars" id="mk-bars"><button type="button" data-v="4">4</button><button type="button" data-v="8">8</button><button type="button" data-v="16">16</button><button type="button" data-v="24">24</button><button type="button" data-v="32">32</button></div></div>
         <div class="field field--range"><span class="lab"><label for="mk-tempo">Speed</label><output id="mk-tempo-out"></output></span><input type="range" id="mk-tempo" min="40" max="180" step="2"></div>
         <label class="check"><input type="checkbox" id="mk-scale"> Shade notes outside the key</label>
       </div>
@@ -121,20 +132,21 @@
         <button class="btn btn--small" id="mk-midi" type="button">Download MIDI</button>
       </div>
     </div>
+
+    <div class="pane method" id="pane-ab" role="tabpanel" aria-labelledby="tab-ab" hidden>
+      <h2>How it works</h2>
+      <ol>
+        <li><b>Reading your description.</b> Words that name a style, mood, speed, instrument, key or length are read as-is. Everything else goes to a description reader trained on 5,521 music descriptions written by musicians, which picks a style, a mood and a speed.</li>
+        <li><b>Writing the chords.</b> A small neural network trained on the chord progressions of pop, rock, folk, classical and jazz music, including 1,098 jazz standards, writes a progression in the genre you asked for, one chord every half bar.</li>
+        <li><b>Writing the melody.</b> A second network trained on the melodies of 1,780 pop, rock, folk and classical songs and 365 transcribed jazz solos writes a new melody over those chords, one sixteenth note at a time. It knows the genre, the chord, the beat, major or minor, and how busy the melody should be. Phrases repeat and answer each other the way songs do, longer songs get a verse and a chorus that both come back, and the song ends on the home note.</li>
+        <li><b>Playing it.</b> The style decides the band and how each player plays the chords: piano arpeggios, rock power chords, jazz comping over a walking bass, folk strumming, a march oom-pah and more. The drums are built from scratch in the browser, and every spotlight follows its player's notes.</li>
+        <li><b>Song Maker.</b> A note grid for writing your own song with the same band, with no AI involved.</li>
+      </ol>
+      <p class="credit">Training data: <a href="https://github.com/music-x-lab/POP909-Dataset">POP909</a> (Wang et al., 2020, MIT license); the <a href="https://github.com/Computational-Cognitive-Musicology-Lab/CoCoPops">CoCoPops</a> corpus (Arthur and Condit-Schultz, 2023), which includes the Rolling Stone 200 of de Clercq and Temperley and the McGill Billboard set of Burgoyne, Wild and Fujinaga; the <a href="https://github.com/jukedeck/nottingham-dataset">Nottingham Music Database</a> as cleaned by Jukedeck; Bach chorales and string quartets by Haydn, Mozart and Beethoven from the <a href="https://www.music21.org/">music21</a> corpus; jazz solos from the <a href="https://jazzomat.hfm-weimar.de/">Weimar Jazz Database</a> (Pfleiderer et al., 2017, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>); iReal Pro jazz chord changes from the <a href="https://github.com/klausfrieler/parkR">parkR</a> package (MIT license); and <a href="https://research.google/resources/datasets/musiccaps/">MusicCaps</a> by Google (Agostinelli et al., 2023, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; the description reader trained on it is shared under the same license) with <a href="https://nlp.stanford.edu/projects/glove/">GloVe</a> word vectors. Instrument sounds: the FluidR3 General MIDI soundfont by Frank Wen, rendered by <a href="https://github.com/gleitz/midi-js-soundfonts">gleitz/midi-js-soundfonts</a>, licensed <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>; every third note kept, trimmed and converted to mono.</p>
+      <p class="credit">Code: <a href="https://github.com/s-milly/ai-composer">github.com/s-milly/ai-composer</a></p>
+    </div>
   </section>
 
-  <section class="method" aria-labelledby="m-title">
-    <h2 id="m-title">How it works</h2>
-    <ol>
-      <li><b>Reading your description.</b> Words that name a style, mood, speed, instrument, key or length are read as-is. Everything else goes to a description reader trained on 5,521 music descriptions written by musicians, which picks a style, a mood and a speed.</li>
-      <li><b>Writing the chords.</b> A small neural network trained on the chord progressions of pop, rock, folk, classical and jazz music, including 1,098 jazz standards, writes a progression in the genre you asked for, one chord every half bar.</li>
-      <li><b>Writing the melody.</b> A second network trained on the melodies of 1,780 pop, rock, folk and classical songs and 365 transcribed jazz solos writes a new melody over those chords, one sixteenth note at a time. It knows the genre, the chord, the beat, major or minor, and how busy the melody should be. Phrases repeat and answer each other the way songs do, and the song ends on the home note.</li>
-      <li><b>Playing it.</b> The style decides the band and how each player plays the chords: piano arpeggios, rock power chords, jazz comping over a walking bass, folk strumming, a march oom-pah and more. The drums are built from scratch in the browser, and every spotlight follows its player's notes.</li>
-      <li><b>Song Maker.</b> A note grid for writing your own song with the same band, with no AI involved.</li>
-    </ol>
-    <p class="credit">Training data: <a href="https://github.com/music-x-lab/POP909-Dataset">POP909</a> (Wang et al., 2020, MIT license); the <a href="https://github.com/Computational-Cognitive-Musicology-Lab/CoCoPops">CoCoPops</a> corpus (Arthur and Condit-Schultz, 2023), which includes the Rolling Stone 200 of de Clercq and Temperley and the McGill Billboard set of Burgoyne, Wild and Fujinaga; the <a href="https://github.com/jukedeck/nottingham-dataset">Nottingham Music Database</a> as cleaned by Jukedeck; Bach chorales and string quartets by Haydn, Mozart and Beethoven from the <a href="https://www.music21.org/">music21</a> corpus; jazz solos from the <a href="https://jazzomat.hfm-weimar.de/">Weimar Jazz Database</a> (Pfleiderer et al., 2017, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>); iReal Pro jazz chord changes from the <a href="https://github.com/klausfrieler/parkR">parkR</a> package (MIT license); and <a href="https://research.google/resources/datasets/musiccaps/">MusicCaps</a> by Google (Agostinelli et al., 2023, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; the description reader trained on it is shared under the same license) with <a href="https://nlp.stanford.edu/projects/glove/">GloVe</a> word vectors. Instrument sounds: the FluidR3 General MIDI soundfont by Frank Wen, rendered by <a href="https://github.com/gleitz/midi-js-soundfonts">gleitz/midi-js-soundfonts</a>, licensed <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>; every third note kept, trimmed and converted to mono.</p>
-    <p class="credit">Code: <a href="https://github.com/s-milly/ai-composer">github.com/s-milly/ai-composer</a></p>
-  </section>
 
   <footer>Built by Shawn Miller · <a href="https://s-milly.github.io/">s-milly.github.io</a></footer>
 </div>

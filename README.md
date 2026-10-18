@@ -20,7 +20,7 @@ Live page: https://s-milly.github.io/ai-composer/
 
 **Melody model** (`scripts/train_melody.py` -> `site/melody.*`): a 2-layer GRU that writes one sixteenth note at a time, conditioned on genre, the current and next chord, the beat, the bar in the phrase, major or minor and how busy the melody should be. Genres are sampled equally in training. The model on the page was trained on 90% of the songs (2,145), with the rest kept aside to check it.
 
-**Song writer** (`site/js/writer.js`): phrases in A A', A B A' or A A' B A'' form; the answering phrase repeats the first three bars and comes home; the song ends on the home note.
+**Song writer** (`site/js/writer.js`): songs of 8 to 32 bars (picked on the page, or read from the description, like "a one minute song"). Phrases follow forms like A A' B A'; 24 and 32 bar songs add a chorus, and 32 bar songs play the verse and chorus twice. The answering phrase repeats the first three bars and comes home, and the song ends on the home note.
 
 **Band** (`site/js/arrange.js`, `site/js/audio.js`, `site/js/stage.js`): each of the 10 styles sets the band, a speed range, a drum beat and how each part plays the chords (pads, arpeggios, stabs, power chords, strumming, fingerpicking, jazz comping over a walking bass, march oom-pah). Instruments are FluidR3 soundfont recordings (`scripts/fetch_samples.py`); drums are synthesized in the browser.
 

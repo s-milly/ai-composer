@@ -9,7 +9,7 @@ import { drawRoll, rollHead, rollTip } from "./roll.js";
 import { downloadMidi } from "./midi.js";
 
 const $ = id => document.getElementById(id);
-const state = { tab: "ai", ai: null, read: null, playing: null };
+const state = { tab: "ai", ai: null, read: null, playing: null, length: 0 };  // length 0 = from the description
 const EXAMPLES = [
   "A loud, hype rock walk-up song",
   "A slow, sad piano song for a rainy night",
@@ -90,7 +90,7 @@ async function composeFrom(text) {
   const r = readDescription(text);
   state.read = r;
   const style = r.style.value;
-  const settings = { style, minor: r.minor, key: r.key ?? pickKey(style), bars: r.bars, tempo: r.tempo, creativity: r.creativity,
+  const settings = { style, minor: r.minor, key: r.key ?? pickKey(style), bars: state.length || r.bars, tempo: r.tempo, creativity: r.creativity,
     band: r.band, drums: r.drums, speed: r.speed.value };
   await runCompose(settings, null);
 }
@@ -152,7 +152,7 @@ function renderHeard() {
     ["Style", S.name, styleChanged ? "You picked it below" : why(r.style)],
     ["Mood", `${moodName}, ${s.minor ? "minor" : "major"} key`, why(r.mood, `${S.name} songs use a minor key`)],
     ["Speed", `${{ slow: "Slow", medium: "Medium", fast: "Fast" }[r.speed.value]} · ${s.tempo} bpm`, why(r.speed)],
-    ["Length", `${s.bars} bars · about ${secs} seconds`, r.tokens.some(t => ["short", "long", "bars"].includes(t)) ? "From your description" : "Say short or long to change it"],
+    ["Length", `${s.bars} bars · about ${secs} seconds`, state.length ? "You picked it" : r.lengthHow === "said" ? "From your description" : "The usual length; pick another above"],
   ];
   const bandText = s.band.map(id => (INST[id] ? INST[id].name : "off")).join(" · ") + (s.drums ? ` · ${BEAT_NAMES[s.drums]} drums` : "");
   const bandWhy = r.named.length ? `You named ${list(r.named.map(id => INST[id].name.toLowerCase()))}` : `The usual ${S.name.toLowerCase()} band`;
@@ -168,7 +168,6 @@ function syncAdjust() {
   $("a-drums").value = s.drums || "";
   $("a-key").value = s.key;
   $("a-mode").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === +s.minor)));
-  $("a-bars").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === s.bars)));
   $("a-tempo").value = s.tempo; $("a-tempo-out").textContent = `${s.tempo} bpm`;
   $("a-temp").value = s.creativity; $("a-temp-out").textContent = (+s.creativity).toFixed(2);
   s.band.forEach((id, v) => ($(`a-part-${v}`).value = INST[id] ? id : "off"));
@@ -194,7 +193,6 @@ function mountAdjust() {
   $("a-band").addEventListener("change", e => { s().band[+e.target.dataset.v] = e.target.value; rearrange(); });
   const seg = (id, fn) => $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; fn(+b.dataset.v); syncAdjust(); });
   seg("a-mode", v => (s().minor = !!v));
-  seg("a-bars", v => (s().bars = v));
 }
 
 /* ---------- Tabs ---------- */
@@ -202,12 +200,14 @@ function setTab(tab) {
   if (state.tab === tab) return;
   if (state.playing) stopPlay();
   state.tab = tab;
-  for (const [t, id] of [["ai", "tab-ai"], ["mk", "tab-mk"]]) {
+  for (const [t, id] of [["ai", "tab-ai"], ["mk", "tab-mk"], ["ab", "tab-ab"]]) {
     $(id).setAttribute("aria-selected", String(t === tab)); $(id).tabIndex = t === tab ? 0 : -1;
   }
-  $("pane-ai").hidden = tab !== "ai"; $("pane-mk").hidden = tab !== "mk";
+  $("pane-ai").hidden = tab !== "ai"; $("pane-mk").hidden = tab !== "mk"; $("pane-ab").hidden = tab !== "ab";
+  // the About tab has nothing to play, so the stage steps aside
+  document.querySelector(".stage-wrap").hidden = tab === "ab"; $("stage-legend").hidden = tab === "ab";
   if (tab === "mk") drawMaker();
-  stageForTab(); refreshPlayable();
+  if (tab !== "ab") { stageForTab(); refreshPlayable(); }
 }
 
 const FACTS = [
@@ -223,6 +223,15 @@ function init() {
   stageForTab();
   mountAdjust();
   mountMaker($("pane-mk"), { onChange: () => { if (state.tab === "mk") { stageForTab(); refreshPlayable(); } } });
+  $("length").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.length = +b.dataset.v;
+    $("length").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    if (state.ai && !$("compose").disabled) {
+      const bars = state.length || state.read.bars;
+      if (bars !== state.ai.settings.bars) runCompose({ ...state.ai.settings, bars });
+    }
+  });
   $("examples").innerHTML = EXAMPLES.map(t => `<button type="button">${t}</button>`).join("");
   $("examples").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || $("compose").disabled) return; $("prompt").value = b.textContent; composeFrom(b.textContent); });
   $("ask").addEventListener("submit", e => {
@@ -240,9 +249,11 @@ function init() {
   $("play").addEventListener("click", () => (state.playing ? stopPlay() : startPlay()));
   $("tab-ai").addEventListener("click", () => setTab("ai"));
   $("tab-mk").addEventListener("click", () => setTab("mk"));
+  $("tab-ab").addEventListener("click", () => setTab("ab"));
   $("tab-ai").parentElement.addEventListener("keydown", e => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const next = state.tab === "ai" ? "mk" : "ai"; setTab(next); $(`tab-${next}`).focus();
+    const order = ["ai", "mk", "ab"], i = order.indexOf(state.tab);
+    const next = order[(i + (e.key === "ArrowRight" ? 1 : order.length - 1)) % order.length]; setTab(next); $(`tab-${next}`).focus();
   });
   $("roll").addEventListener("pointermove", e => rollTip(e, state.ai && state.ai.song, $("roll-tip"), $("roll-scroll").parentElement));
   $("roll").addEventListener("pointerleave", () => $("roll-tip").classList.remove("on"));

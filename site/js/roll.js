@@ -6,7 +6,7 @@ const PAD = { l: 44, r: 12, t: 22, b: 10 };
 export function drawRoll(svg, scroll, song) {
   const steps = song ? song.steps : 128;
   // fit the whole song on wide screens; on a phone keep notes readable and scroll sideways
-  const stepW = Math.max(scroll.clientWidth < 600 ? 9 : 3, (scroll.clientWidth - PAD.l - PAD.r - 2) / steps);
+  const stepW = Math.max(scroll.clientWidth < 600 ? 9 : 1.6, (scroll.clientWidth - PAD.l - PAD.r - 2) / steps);
   const w = PAD.l + PAD.r + steps * stepW, h = svg.clientHeight || 300;
   svg.setAttribute("width", w); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
   const all = song ? song.parts.flatMap(p => p.notes.map(n => n.p)) : [48, 72];

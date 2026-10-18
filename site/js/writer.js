@@ -37,6 +37,7 @@ function chordPhrase(genre, minor, slots, { start, end, prev, temp, offset = 0 }
         const r = rootOf(i);
         if (runSame && i === out[out.length - 1]) bias[i] -= 2.5;           // do not sit on one chord for over two bars
         if (s === 0 && start === "away" && r === home) bias[i] -= 3;        // a new section starts away from home
+        if (s === 0 && start === "lift") bias[i] += r === home ? -3 : (minor ? [5, 0] : [5, 9]).includes(r) ? 2.5 : 0;  // a chorus often opens on IV or vi
         if (end === "half" && s >= slots - 2 && r === five) bias[i] += 2.5;  // end the first phrase on the five chord
         if (end === "home" && s === slots - 3 && r === five) bias[i] += 1.5; // lead into the final chord
       }
@@ -87,44 +88,59 @@ function melody(st, mel, chords, from, to, opts) {
   }
 }
 
+// Song forms, four bars per phrase. Each entry is section:how:ending.
+//   new     a new phrase           answer  repeats the first three bars of that section's first phrase, new last bar
+//   repeat  plays phrase number n again (a second verse and chorus)
+// A is the verse, C the chorus and B the bridge.
+const FORMS = {
+  4: ["A:new:home"],
+  8: ["A:new:half", "A:answer:home"],
+  12: ["A:new:half", "B:new:half", "A:answer:home"],
+  16: ["A:new:half", "A:answer:home", "B:new:half", "A:answer:home"],
+  24: ["A:new:half", "A:answer:home", "C:new:half", "C:answer:home", "B:new:half", "A:answer:home"],
+  32: ["A:new:half", "A:answer:home", "C:new:half", "C:answer:home", "A:repeat:0", "A:repeat:1", "C:repeat:2", "C:answer:home"],
+};
+export const LENGTHS = Object.keys(FORMS).map(Number);
+
 // Builds the whole song. Returns {chords (per half bar), melody (per sixteenth)} in C major / A minor.
-export async function writeSong({ genre, melodyGenre, minor, bars, dens, temp, onProgress = () => {} }) {
+export async function writeSong({ genre, melodyGenre, minor, bars, dens, temp, keepChords = null, onProgress = () => {} }) {
   const half = 2, chordTemp = Math.min(0.85, Math.max(0.5, temp * 0.75));
-  const plans = { 4: ["A"], 8: ["A", "A2"], 12: ["A", "B", "A2"], 16: ["A", "A2", "B", "A3"] }[bars];
-  const A = chordPhrase(genre, minor, 4 * half, { start: "home", end: bars === 4 ? "home" : "half", temp: chordTemp });
-  const B = bars >= 12 ? chordPhrase(genre, minor, 4 * half, { start: "away", end: "half", prev: A[A.length - 1], temp: chordTemp }) : null;
-  const chords = [];
-  plans.forEach(p => {
-    if (p === "A") chords.push(...A);
-    else if (p === "B") chords.push(...B);
-    else {
-      // the answering phrase keeps the first three bars and comes home in the fourth
-      chords.push(...A.slice(0, 3 * half), ...chordPhrase(genre, minor, half, { end: "home", prev: A[5], temp: chordTemp, offset: 6 }));
-    }
-  });
+  const form = FORMS[bars].map(x => { const [sec, how, end] = x.split(":"); return { sec, how, end }; });
+  // one chord progression per section: the verse starts at home, the chorus lifts to another chord, the bridge goes away
+  const start = { A: "home", C: "lift", B: "away" };
+  const prog = {};
+  for (const sec of [...new Set(form.map(f => f.sec))]) {
+    const end = form.length === 1 ? "home" : "half";
+    prog[sec] = chordPhrase(genre, minor, 4 * half, { start: start[sec], end, prev: prog.A ? prog.A[prog.A.length - 1] : undefined, temp: chordTemp });
+  }
   const steps = bars * 16, mel = new Array(steps).fill(REST), st = { h: MEL.state() };
-  const opts = { genre: melodyGenre, minor, dens, temp };
-  let phraseA = null;
-  for (let i = 0; i < plans.length; i++) {
-    const from = i * 64, to = from + 64, last = i === plans.length - 1;
-    const replay = plans[i].startsWith("A") && plans[i] !== "A" && phraseA
-      ? Object.fromEntries(phraseA.slice(0, 48).map((v, k) => [from + k, v])) : null;
-    melody(st, mel, chords, from, to, { ...opts, replay, finalBar: last ? steps - 16 : undefined });
-    if (plans[i] === "A") phraseA = mel.slice(from, to);
+  const chords = [], first = {};
+  for (let i = 0; i < form.length; i++) {
+    const f = form[i], from = i * 64, last = i === form.length - 1;
+    let ch, replay = null;
+    if (f.how === "repeat") {
+      const k = +f.end;
+      ch = chords.slice(k * 8, k * 8 + 8);
+      replay = Object.fromEntries(mel.slice(k * 64, k * 64 + 64).map((v, j) => [from + j, v]));
+    } else if (f.how === "answer") {
+      // keeps the first three bars and comes home in the fourth
+      const P = prog[f.sec];
+      ch = [...P.slice(0, 3 * half), ...chordPhrase(genre, minor, half, { end: "home", prev: P[5], temp: chordTemp, offset: 6 })];
+      replay = Object.fromEntries(mel.slice(first[f.sec] * 64, first[f.sec] * 64 + 48).map((v, j) => [from + j, v]));
+    } else ch = prog[f.sec];
+    if (keepChords) ch = keepChords.slice(i * 8, i * 8 + 8);
+    chords.push(...ch);
+    if (f.how === "new") first[f.sec] = i;
+    // the chorus is a little busier than the verse
+    const d = f.sec === "C" ? Math.min(2, dens + 1) : dens;
+    melody(st, mel, chords, from, from + 64, { genre: melodyGenre, minor, dens: d, temp, replay, finalBar: last ? steps - 16 : undefined });
     onProgress(`Writing bar ${Math.min(bars, (i + 1) * 4)} of ${bars}`);
     await new Promise(r => setTimeout(r));
   }
-  return { chords: chords.map(t => ({ root: rootOf(t), qual: Q[qualOf(t)] })), melody: mel };
+  return { chords: chords.map(t => ({ root: rootOf(t), qual: Q[qualOf(t)] })), melody: mel, form: form.map(f => f.sec) };
 }
 
-// Just a new melody over the same chords.
-export async function rewriteMelody(song, { melodyGenre, minor, dens, temp }) {
-  const toks = song.chords.map(c => c.root * NQ + Q.indexOf(c.qual));
-  const steps = song.melody.length, mel = new Array(steps).fill(REST), st = { h: MEL.state() };
-  const bars = steps / 16, phrases = bars / 4;
-  for (let i = 0; i < phrases; i++) {
-    melody(st, mel, toks, i * 64, i * 64 + 64, { genre: melodyGenre, minor, dens, temp, finalBar: i === phrases - 1 ? steps - 16 : undefined });
-    await new Promise(r => setTimeout(r));
-  }
-  return { chords: song.chords, melody: mel };
+// Just a new melody over the same chords, in the same form.
+export function rewriteMelody(song, opts) {
+  return writeSong({ ...opts, bars: song.melody.length / 16, keepChords: song.chords.map(c => c.root * NQ + Q.indexOf(c.qual)) });
 }

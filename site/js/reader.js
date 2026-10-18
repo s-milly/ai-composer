@@ -27,7 +27,8 @@ export const tokensOf = text => (text.toLowerCase().replace(/’/g, "'").match(T
 // They are kept away from the model so they cannot tip its guesses.
 const FILLER = new Set(["song", "songs", "music", "track", "tune", "tunes", "piece", "bars", "bar", "measures", "bpm", "beats", "minute",
   "major", "minor", "key", "sharp", "flat", "solo", "only", "just", "alone", "really", "very", "pretty", "kind", "sort", "like",
-  "something", "want", "make", "play", "write", "please", "maybe", "little", "lot", "bit", "sounds", "sounding", "feel", "feeling", "vibe", "vibes", "type"]);
+  "something", "want", "make", "play", "write", "please", "maybe", "little", "lot", "bit", "sounds", "sounding", "feel", "feeling", "vibe", "vibes", "type",
+  "minutes", "min", "mins", "seconds", "second", "sec", "secs", "short", "long", "longer", "brief", "extended", "full", "half"]);
 const usable = t => !R.stopSet.has(t) && R.index.has(t) && !FILLER.has(t) && !/^\d+$/.test(t) && t.length > 1;
 
 // The trained model: probabilities for each answer to one question, plus the words behind the winner.
@@ -175,11 +176,21 @@ export function readDescription(text) {
   if (bpm) { out.tempo = Math.max(40, Math.min(180, +bpm[1])); out.speed = { value: out.speed.value, words: [bpm[0]], how: "said" }; }
 
   // length
-  out.bars = 8;
-  const barsMatch = text.toLowerCase().match(/\b(\d{1,2})\s*(bars?|measures?)\b/);
-  if (barsMatch) out.bars = [4, 8, 12, 16].reduce((a, b) => (Math.abs(b - +barsMatch[1]) < Math.abs(a - +barsMatch[1]) ? b : a));
-  else if (toks.some(t => ["short", "brief", "tiny", "little"].includes(t))) out.bars = 4;
-  else if (toks.some(t => ["long", "longer", "extended", "full"].includes(t))) out.bars = 16;
+  // length: bars, a time ("a one minute song", "30 seconds"), or short and long
+  const nearest = (n, opts) => opts.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+  const low = text.toLowerCase();
+  const WORDS = { a: 1, an: 1, one: 1, two: 2, three: 3, half: 0.5 };
+  const barsMatch = low.match(/\b(\d{1,2})\s*(bars?|measures?)\b/);
+  const timeMatch = low.match(/\b(\d+(?:\.\d+)?|an?|one|two|three|half an?|half)\s*(?:-\s*)?(minutes?|mins?|seconds?|secs?)\b/);
+  out.bars = 16; out.lengthHow = "default";
+  if (barsMatch) { out.bars = nearest(+barsMatch[1], [4, 8, 12, 16, 24, 32]); out.lengthHow = "said"; }
+  else if (timeMatch) {
+    const n = WORDS[timeMatch[1].split(" ")[0]] ?? parseFloat(timeMatch[1]);
+    const seconds = n * (timeMatch[2].startsWith("m") ? 60 : 1);
+    out.bars = nearest((seconds * out.tempo) / 240, [8, 16, 24, 32]); out.lengthHow = "said";
+  } else if (toks.some(t => ["short", "brief", "tiny", "quick"].includes(t))) { out.bars = 8; out.lengthHow = "said"; }
+  else if (toks.some(t => ["full", "extended"].includes(t)) || /\bvery long\b/.test(low)) { out.bars = 32; out.lengthHow = "said"; }
+  else if (toks.some(t => ["long", "longer"].includes(t))) { out.bars = 24; out.lengthHow = "said"; }
 
   // creativity
   out.creativity = 0.9;
