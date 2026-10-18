@@ -6,7 +6,7 @@ import * as audio from "./audio.js";
 
 const RANGES = [[55, 84], [50, 79], [43, 72], [28, 57]];  // lowest and highest note on each track's grid
 const LENGTHS = [[1, "1/16"], [2, "1/8"], [4, "1/4"], [8, "1/2"], [16, "1"]];
-const STORE = "ai-composer.maker.v1";
+const STORE = "ai-composer.maker.v1";  // kept from the old name so songs people already saved still load
 
 const empty = () => ({
   tempo: 100, bars: 8, key: 0, minor: false, showScale: true, len: 4, track: 0,

@@ -1,8 +1,8 @@
-# AI Composer
+# Music Composer
 
 Describe a song ("a loud, hype rock walk-up song", "chill late night jazz with a saxophone") and AI writes it: one model reads the description, a chord model writes a progression in that genre, a melody model writes a tune over the chords, and a band plays it on a stage where each player's spotlight follows their part. The Song Maker tab lets you write your own song on a note grid with no AI involved.
 
-Live page: https://s-milly.github.io/ai-composer/
+Live page: https://s-milly.github.io/music-composer/
 
 ## How it works
 

@@ -296,7 +296,7 @@ function init() {
   $("again").addEventListener("click", () => runCompose(state.ai.settings, null));
   $("reharm").addEventListener("click", () => runCompose(state.ai.settings, true));
   $("to-maker").addEventListener("click", () => { loadSong(state.ai.song); setTab("mk"); $("tab-mk").scrollIntoView({ block: "start", behavior: "smooth" }); });
-  $("midi").addEventListener("click", () => { const s = state.ai.settings; downloadMidi(state.ai.song, `ai-composer-${STYLES[s.style].name.split(" ")[0].toLowerCase()}-${KEYS[s.key].replace("#", "sharp")}-${s.minor ? "minor" : "major"}.mid`); });
+  $("midi").addEventListener("click", () => { const s = state.ai.settings; downloadMidi(state.ai.song, `music-composer-${STYLES[s.style].name.split(" ")[0].toLowerCase()}-${KEYS[s.key].replace("#", "sharp")}-${s.minor ? "minor" : "major"}.mid`); });
   $("mk-midi").addEventListener("click", () => downloadMidi(makerSong(), "my-song.mid"));
   $("play").addEventListener("click", () => (state.playing ? stopPlay() : startPlay()));
   $("tab-ai").addEventListener("click", () => setTab("ai"));
