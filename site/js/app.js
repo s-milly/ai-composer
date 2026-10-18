@@ -211,7 +211,7 @@ function setTab(tab) {
 }
 
 const FACTS = [
-  ["1,987", "songs the composer learned from: pop, rock, folk and classical"],
+  ["2,404", "songs and solos the composer learned from, in 5 genres"],
   ["1,098", "jazz standards it learned chord changes from"],
   ["5,521", "descriptions by musicians the reader learned from"],
   [INSTRUMENTS.length, "instruments to choose from, no vocals"],

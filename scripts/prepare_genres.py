@@ -345,7 +345,7 @@ def wjazzd():
         times = np.array([b[0] for b in beats])
         def six(t):
             return int(round(np.interp(t, times, np.arange(len(times))) * 4))
-        notes = [(six(o), max(1, six(o + d) - six(o)), p) for o, d, p in con.execute("select onset, duration, pitch from melody where melid=? order by onset", (melid,))]
+        notes = [(six(o), max(1, six(o + d) - six(o)), int(round(p))) for o, d, p in con.execute("select onset, duration, pitch from melody where melid=? order by onset", (melid,))]
         chords, last = [], None
         for i, (_, _, _, ch) in enumerate(beats):
             if ch and ch != last:
