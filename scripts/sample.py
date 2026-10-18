@@ -5,23 +5,41 @@ from model import Composer, HOLD, REST, N_TOK
 LOW = 33
 # pitch ranges per voice in C major / A minor (MIDI), roughly Bach's 1st to 99th percentile
 RANGES = [(60, 81), (53, 74), (48, 69), (36, 62)]
+ENDING_TRIES = 8
 
 
 def tok_of(midi):
     return midi - LOW + 2
 
 
+def ends_home(sound, minor):
+    """True if every part is sounding and the last chord is the home chord with the tonic in the bass."""
+    if (sound == 0).any():
+        return False
+    pcs = {(s - 1 + LOW) % 12 for s in sound}
+    tonic = 9 if minor else 0
+    bass = (sound[3] - 1 + LOW) % 12
+    return bass == tonic and (pcs <= {tonic, (tonic + 3) % 12, (tonic + 7) % 12} or pcs <= {tonic, (tonic + 4) % 12, (tonic + 7) % 12})
+
+
 def generate(model, n_bars=8, minor=0, temperature=0.9, melody=None, rng=None):
     """Return a (steps, 4) token grid. If melody is given (steps tokens), the soprano is kept
-    and only alto, tenor and bass are written."""
+    and only alto, tenor and bass are written. If the song does not end on the home chord,
+    the last two bars are written again, up to ENDING_TRIES times."""
     rng = rng or np.random.default_rng()
     model.eval()
     steps = n_bars * 16
     grid = np.zeros((steps, 4), dtype=np.int64)
     sound = np.zeros(4, dtype=np.int64)  # sounding pitch token - 1, 0 = silent
     prev, h = REST, None
+    redo = max(0, n_bars - 2) * 16
+    saved = None
+    tries = 0
+    t = 0
     with torch.no_grad():
-        for t in range(steps):
+        while t < steps:
+            if t == redo and saved is None:
+                saved = (sound.copy(), prev, h)
             new = sound.copy()
             for v in range(4):
                 ctx = [new[u] if u < v else sound[u] for u in range(4)]
@@ -38,6 +56,11 @@ def generate(model, n_bars=8, minor=0, temperature=0.9, melody=None, rng=None):
                     new[v] = tok - 1
                 prev = tok
             sound = new
+            t += 1
+            if t == steps and not ends_home(sound, minor) and tries < ENDING_TRIES - 1:
+                tries += 1
+                sound, prev, h = saved[0].copy(), saved[1], saved[2]
+                t = redo
     return grid
 
 

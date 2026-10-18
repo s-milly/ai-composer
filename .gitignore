@@ -2,3 +2,4 @@ data/raw/
 data/*.pt
 data/chorales.pkl
 __pycache__/
+data/*.log

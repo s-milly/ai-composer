@@ -1,0 +1,7 @@
+{
+ "val_chorales": 45,
+ "train_chorales": 261,
+ "val_nll": 0.45679533703248154,
+ "val_acc": 0.8632023039611965,
+ "val_new_note_acc": 0.5804749340369393
+}

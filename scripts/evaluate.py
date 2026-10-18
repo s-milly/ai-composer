@@ -5,10 +5,11 @@ page), and songs of random notes with Bach-like rhythms. All grids are in C majo
 import json, pickle, sys
 import numpy as np, torch
 from model import Composer, HOLD, REST
+import sample
 from sample import generate, RANGES, LOW
 
 N_SONGS, BARS, TEMP = 200, 8, 0.9
-torch.set_num_threads(1)
+torch.set_num_threads(4)
 MAJOR = {0, 2, 4, 5, 7, 9, 11}
 MINOR = {9, 11, 0, 2, 4, 5, 7, 6, 8}  # natural, harmonic and melodic minor on A
 
@@ -114,15 +115,21 @@ def main():
         if i % 50 == 49:
             print(i + 1, "songs", flush=True)
     mod = summarize(gens)
+    # the same model with the ending rewrite turned off, to show how much that rule adds
+    sample.ENDING_TRIES = 1
+    raw = [score(generate(model, BARS, i % 2, TEMP, rng=rng), i % 2)["cadence"] for i in range(N_SONGS)]
+    sample.ENDING_TRIES = 8
+    cadence_raw = float(np.mean(raw))
+    print("cadence without rewrite", cadence_raw)
     labels = {"in_key": "Notes in the key", "chords": "Beats on a standard chord",
-              "steps": "Melody moves that are a step (1 or 2 half steps)", "cadence": "Songs that end on the home chord"}
+              "steps": "Melody moves by step", "cadence": "Songs that end on the home chord"}
     rules = [dict(id=k, label=labels[k], bach=bach[k], model=mod[k], random=rand[k]) for k in labels]
     print("parallels", bach["parallels"], mod["parallels"], rand["parallels"])
     for r in rules:
         print(f"{r['label']:50s} bach {r['bach']:.3f} model {r['model']:.3f} random {r['random']:.3f}")
     ev = json.load(open("data/eval_metrics.json"))
     method = json.load(open("scripts/method.json"))
-    json.dump(dict(chorales=len(chorales), songs=N_SONGS, temperature=TEMP, eval=ev, rules=rules, method=method),
+    json.dump(dict(chorales=len(chorales), songs=N_SONGS, temperature=TEMP, eval=ev, cadence_no_rewrite=cadence_raw, rules=rules, method=method),
               open("site/stats.json", "w"), indent=1)
 
 

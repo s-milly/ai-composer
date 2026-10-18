@@ -384,12 +384,24 @@ function pick(logits, v, t, sound, now, temp) {
   return ok.lastIndexOf(true);
 }
 
-// Writes the song a few steps at a time so the page stays responsive.
+// True if every part is sounding and the last chord is the home chord with the tonic in the bass.
+function endsHome(sound, minor) {
+  if (sound.some(x => x === 0)) return false;
+  const pc = x => (x - 1 + LOW) % 12, tonic = minor ? 9 : 0;
+  const pcs = sound.map(pc);
+  const inChord = third => pcs.every(p => p === tonic || p === (tonic + third) % 12 || p === (tonic + 7) % 12);
+  return pc(sound[3]) === tonic && (inChord(3) || inChord(4));
+}
+
+// Writes the song a few steps at a time so the page stays responsive. If it does not end on the
+// home chord, the last two bars are written again, up to 8 tries.
 async function compose(bars, minor, temp, melody) {
   const steps = bars * 16, grid = Array.from({ length: steps }, () => [0, 0, 0, 0]);
-  const st = { h0: new Float32Array(H), h1: new Float32Array(H) };
-  let sound = [0, 0, 0, 0], prev = REST;
-  for (let t = 0; t < steps; t++) {
+  let st = { h0: new Float32Array(H), h1: new Float32Array(H) };
+  let sound = [0, 0, 0, 0], prev = REST, saved = null, tries = 0;
+  const redo = Math.max(0, bars - 2) * 16;
+  for (let t = 0; t < steps; ) {
+    if (t === redo && !saved) saved = { h0: st.h0, h1: st.h1, sound: sound.slice(), prev };
     const now = sound.slice();
     for (let v = 0; v < 4; v++) {
       const ctx = [0, 1, 2, 3].map(u => (u < v ? now[u] : sound[u]));
@@ -400,7 +412,12 @@ async function compose(bars, minor, temp, melody) {
       prev = tok;
     }
     sound = now;
-    if (t % 8 === 7) { setStatus(`Writing bar ${Math.floor(t / 16) + 1} of ${bars}…`); await new Promise(r => setTimeout(r)); }
+    t++;
+    if (t % 8 === 0) { setStatus(tries ? `Rewriting the ending (try ${tries + 1})…` : `Writing bar ${Math.ceil(t / 16)} of ${bars}…`); await new Promise(r => setTimeout(r)); }
+    if (t === steps && !endsHome(sound, minor) && tries < 7) {
+      tries++;
+      st = { h0: saved.h0, h1: saved.h1 }; sound = saved.sound.slice(); prev = saved.prev; t = redo;
+    }
   }
   return grid;
 }
@@ -716,7 +733,7 @@ function drawRules() {
     SERIES.forEach(([k, name, color], j) => {
       const y = y0 + lead + j * (barH + gap), v = r[k];
       const wv = Math.max(1, x(v) - labW);
-      out += `<path class="bar" data-r="${i}" data-k="${k}" d="M${labW},${y} h${wv - 4} a4,4 0 0 1 4,4 v${barH - 8} a4,4 0 0 1 -4,4 h${-(wv - 4)} z" fill="${color}"/>`;
+      if (v > 0.005) out += `<path class="bar" data-r="${i}" data-k="${k}" d="M${labW},${y} h${Math.max(0, wv - 4)} a4,4 0 0 1 4,4 v${barH - 8} a4,4 0 0 1 -4,4 h${-Math.max(0, wv - 4)} z" fill="${color}"/>`;
       out += `<text x="${x(v) + 6}" y="${y + barH - 2}" font-size="11.5" fill="var(--ink-2)">${(v * 100).toFixed(0)}%</text>`;
       out += `<rect class="hit" data-r="${i}" data-k="${k}" x="${labW}" y="${y - 1}" width="${plotW}" height="${barH + 2}" fill="transparent"/>`;
     });
@@ -730,8 +747,9 @@ function rulesTip(e) {
   const r = STATS.rules[+el.dataset.r], s = SERIES.find(([k]) => k === el.dataset.k);
   tip.textContent = `${s[1]}: ${pct(r[s[0]])} (${r.label.toLowerCase()})`;
   const box = el.getBoundingClientRect(), wrap = $("rules-wrap").getBoundingClientRect();
-  const bar = $("rules").querySelector(`.bar[data-r="${el.dataset.r}"][data-k="${el.dataset.k}"]`).getBoundingClientRect();
-  tip.style.left = Math.min(wrap.width - 140, Math.max(140, bar.right - wrap.left)) + "px";
+  const barEl = $("rules").querySelector(`.bar[data-r="${el.dataset.r}"][data-k="${el.dataset.k}"]`);
+  const right = barEl ? barEl.getBoundingClientRect().right : box.left;
+  tip.style.left = Math.min(wrap.width - 140, Math.max(140, right - wrap.left)) + "px";
   tip.style.top = (box.top - wrap.top) + "px";
   tip.classList.add("on");
 }
@@ -745,7 +763,7 @@ function fillStats(s) {
     [INSTRUMENTS.length, "instruments to choose from, no vocals"],
   ].map(([b, t]) => `<li><b>${b}</b><span>${t}</span></li>`).join("");
   const r = Object.fromEntries(s.rules.map(x => [x.id, x]));
-  $("rules-read").textContent = `${s.songs} songs from the model (8 bars each, half major and half minor, creativity ${s.temperature}) were scored on four checks a music theory class would use, next to every chorale it learned from and the same number of songs made of random notes. Higher is better on every check. The model lands close to Bach on all four, while random notes miss badly. The biggest gap is the ending: ${pct(r.cadence.model)} of the model's songs end on the home chord, against ${pct(r.cadence.bach)} of Bach's chorales.`;
+  $("rules-read").textContent = `${s.songs} songs from the model (8 bars each, half major and half minor, creativity ${s.temperature}) were scored on four checks a music theory class would use. They are shown next to the ${s.chorales} chorales it learned from and ${s.songs} songs of random notes with Bach-like rhythms. Higher is better on every check. The model stays in the key and moves its melody by step (one or two half steps) as often as Bach does, and it lands on a standard chord on ${pct(r.chords.model)} of beats, against ${pct(r.chords.bach)} for Bach. It ends on the home chord more often than Bach (${pct(r.cadence.model)} against ${pct(r.cadence.bach)}), but that check has help: with the ending rewrite turned off, only ${pct(s.cadence_no_rewrite)} of its songs end there.`;
   $("rules-table").innerHTML = `<thead><tr><th>Check</th>${SERIES.map(([, n]) => `<th>${n}</th>`).join("")}</tr></thead><tbody>` +
     s.rules.map(x => `<tr><td>${x.label}</td>${SERIES.map(([k]) => `<td>${pct(x[k])}</td>`).join("")}</tr>`).join("") + "</tbody>";
   $("method").innerHTML = s.method.map(([b, t]) => `<li><b>${b}</b> ${t}</li>`).join("");

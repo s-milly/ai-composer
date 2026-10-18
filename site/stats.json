@@ -1,0 +1,69 @@
+{
+ "chorales": 306,
+ "songs": 200,
+ "temperature": 0.9,
+ "eval": {
+  "val_chorales": 45,
+  "train_chorales": 261,
+  "val_nll": 0.45679533703248154,
+  "val_acc": 0.8632023039611965,
+  "val_new_note_acc": 0.5804749340369393
+ },
+ "cadence_no_rewrite": 0.4,
+ "rules": [
+  {
+   "id": "in_key",
+   "label": "Notes in the key",
+   "bach": 0.9646054041022116,
+   "model": 0.9800210410874254,
+   "random": 0.6766919729507478
+  },
+  {
+   "id": "chords",
+   "label": "Beats on a standard chord",
+   "bach": 0.8828403494699453,
+   "model": 0.83984375,
+   "random": 0.18078125
+  },
+  {
+   "id": "steps",
+   "label": "Melody moves by step",
+   "bach": 0.7039297865713677,
+   "model": 0.7057414587175375,
+   "random": 0.16384112121940794
+  },
+  {
+   "id": "cadence",
+   "label": "Songs that end on the home chord",
+   "bach": 0.8300653594771242,
+   "model": 0.97,
+   "random": 0.0
+  }
+ ],
+ "method": [
+  [
+   "Data.",
+   "306 of the four-part chorales Bach harmonized, from the music21 corpus. Chorales in 4/4 time with exactly four parts were kept, and each one was moved to C major or A minor so the model learns one key for each mode. Your song is moved into the key you pick after it is written."
+  ],
+  [
+   "Turning music into tokens.",
+   "Each chorale becomes a grid of sixteenth notes with one row for each part. Every cell holds a token: a new note with its pitch, a hold (the last note keeps ringing) or a rest. The model reads the grid one cell at a time: the melody, then the high harmony, the low harmony and the bass, then on to the next sixteenth note."
+  ],
+  [
+   "Model.",
+   "A recurrent neural network (a 2-layer GRU with 256 units, built in PyTorch). At every cell it sees the token it just wrote, the note each part is holding right now, which part it is writing, where it is in the bar, major or minor, and how many bars are left so it knows when to wrap up. It predicts the chances of every possible next token and picks one at random by those chances. The Creativity slider sharpens or flattens those chances before the pick."
+  ],
+  [
+   "Rules added on top.",
+   "Each part stays inside the range Bach used for it, no part moves above the part written over it, two parts never move in parallel fifths or octaves (a classic rule of four-part writing), and the first note cannot be a hold. If the song does not end on the home chord, the model writes the last two bars again, up to 8 tries, the way a composer would rework an ending. Everything else, from the chords to the rhythm to the ending, comes from what the model learned."
+  ],
+  [
+   "Honest testing.",
+   "The next-note score in the header comes from a version of the model trained on 85% of the chorales and graded on the other 15%, which it never saw. The model on this page was then trained on all of them."
+  ],
+  [
+   "In your browser.",
+   "The trained weights were compressed to 8-bit numbers and the network is run by hand in JavaScript, so no server is involved. New harmony keeps the current melody and writes the other three parts again under it. Download MIDI saves the song for GarageBand, MuseScore or any other music program."
+  ]
+ ]
+}
