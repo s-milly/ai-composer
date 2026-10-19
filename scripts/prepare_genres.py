@@ -4,10 +4,14 @@
   folk       the Nottingham Music Database (cleaned by Jukedeck), tunes in duple time
   classical  music21 corpus: Bach chorales and string quartets by Haydn, Mozart and Beethoven
   jazz       Weimar Jazz Database solos, when data/raw/wjazzd/wjazzd.db is present
+  classical  DCML corpora: sonatas, quartets, trio sonatas, suites and songs with expert chord labels
+  mixed      lead sheets from OpenEWLD (public domain songs, genres from Discogs) and the Chord Melody
+             Dataset (jazz standards and pop hits; genres in scripts/cmd_genres.txt)
 Only music in 4/4, 2/4 or 2/2 is kept. Writes data/songs.pkl.
 """
 import glob, os, pickle, re, sqlite3, sys, warnings
 import numpy as np
+NO_CHORD_ROOT = 12
 from songdata import harte, finalize, estimate_chord, pc_of, fix_mode, QUALITIES
 
 warnings.filterwarnings("ignore")
@@ -261,6 +265,134 @@ def nottingham():
     return out
 
 
+# ---------- Lead sheets (OpenEWLD and the Chord Melody Dataset) ----------
+def m21_quality(kind):
+    """music21 chord kind ('minor-seventh', 'dominant-ninth', ...) -> one of QUALITIES."""
+    k = kind or "major"
+    if "half-diminished" in k:
+        return "hdim7"
+    if "diminished" in k:
+        return "dim"
+    if "augmented" in k:
+        return "aug"
+    if "suspended" in k:
+        return "sus"
+    if k.startswith("major-minor") or k.startswith("minor-major"):
+        return "min"
+    if k.startswith("minor"):
+        return "min7" if any(x in k for x in ("seventh", "ninth", "11th", "13th")) else "min"
+    if k.startswith("dominant"):
+        return "7"
+    if k.startswith("major") and any(x in k for x in ("seventh", "ninth", "11th", "13th")):
+        return "maj7"
+    return "maj"
+
+
+def leadsheet(path, genre, source, tonic=None):
+    """A one-staff lead sheet with chord symbols, in 4/4, 2/4 or 2/2."""
+    from music21 import converter, harmony
+    s = converter.parse(path)
+    part = s.parts[0].stripTies()
+    sigs = {t.ratioString for t in s.recurse().getElementsByClass("TimeSignature")}
+    if not sigs or not sigs <= {"4/4", "2/4", "2/2"}:
+        return None
+    first = part.getElementsByClass("Measure").first()
+    bar = first.barDuration.quarterLength if first is not None else 4
+    pad = (bar - first.duration.quarterLength) if first is not None and first.duration.quarterLength < bar else 0
+    notes, chords = [], []
+    for n in part.flatten().notes:
+        on = int(round((n.offset + pad) * 4))
+        if isinstance(n, harmony.ChordSymbol):
+            if n.root() is None:
+                continue
+            ch = (n.root().pitchClass, QUALITIES.index(m21_quality(n.chordKind)))
+            if not chords or chords[-1][2] != ch:
+                chords.append([on, None, ch])
+        elif n.isChord:
+            notes.append((on, max(1, int(round(n.quarterLength * 4))), max(p.midi for p in n.pitches)))
+        else:
+            notes.append((on, max(1, int(round(n.quarterLength * 4))), n.pitch.midi))
+    if len(chords) < 4:
+        return None
+    steps = int(round((part.highestTime + pad) * 4)) // 16 * 16
+    for i in range(len(chords)):
+        chords[i][1] = chords[i + 1][0] if i + 1 < len(chords) else steps
+    if tonic is None:
+        # the key signature read as a major key; fix_mode moves songs whose home chord is minor
+        ks = s.recurse().getElementsByClass("KeySignature").first()
+        tonic = ks.asKey("major").tonic.pitchClass if ks is not None else s.analyze("key").tonic.pitchClass
+    song = finalize(notes, [tuple(c) for c in chords], tonic, False, steps, genre, source)
+    return relative_minor(song)
+
+
+def relative_minor(song):
+    """A key signature cannot tell C major from A minor. Call the song minor when A minor chords
+    outnumber C major ones and it ends on A minor (it is already in place for a minor song)."""
+    if song is None:
+        return None
+    r, q = song["root"], song["qual"]
+    minors = [QUALITIES.index("min"), QUALITIES.index("min7")]
+    home_min = ((r == 9) & np.isin(q, minors)).sum()
+    home_maj = ((r == 0) & ~np.isin(q, minors)).sum()
+    last = r[r != NO_CHORD_ROOT][-1:] if (r != NO_CHORD_ROOT).any() else []
+    if home_min > home_maj and len(last) and last[0] == 9:
+        return {**song, "mode": 1}
+    return song
+
+
+EWLD_GENRE = {"Jazz": "jazz", "Rock": "rock", "Pop": "pop", "Stage & Screen": "pop", "Funk / Soul": "pop", "Latin": "pop",
+              "Electronic": "pop", "Reggae": "pop", "Blues": "jazz", "Folk, World, & Country": "folk", "Classical": "classical",
+              "Brass & Military": "folk"}
+# Discogs tags the recordings, not the song: an old standard gets "Rock" because a rock band covered it.
+# Only call a song rock when its styles say rock too.
+ROCK_STYLES = {"Rock & Roll", "Pop Rock", "Blues Rock", "Rockabilly", "Punk", "Country Rock", "Hard Rock", "Classic Rock",
+               "Folk Rock", "Soft Rock", "Psychedelic Rock", "Garage Rock", "Alternative Rock", "Indie Rock"}
+
+
+def openewld():
+    base = f"{RAW}/openewld"
+    con = sqlite3.connect(f"{base}/OpenEWLD.db")
+    out = []
+    for wid, path in con.execute("select id, path_leadsheet from works"):
+        gs = con.execute("select genre from work_genres where id=? order by occurrences desc", (wid,)).fetchall()
+        styles = {r[0] for r in con.execute("select style from work_style where id=?", (wid,))}
+        if not gs or gs[0][0] not in EWLD_GENRE:
+            continue
+        g = EWLD_GENRE[gs[0][0]]
+        if g == "rock" and not styles & ROCK_STYLES:
+            g = "pop"
+        if g == "pop" and styles & {"Swing", "Big Band", "Dixieland", "Ragtime", "Bop", "Hard Bop", "Cool Jazz"}:
+            g = "jazz"
+        try:
+            s = leadsheet(f"{base}/{path}", g, "openewld/" + os.path.basename(path))
+        except Exception:
+            s = None
+        if s:
+            out.append(s)
+    return out
+
+
+def chord_melody():
+    """The Chord Melody Dataset stores every song in all 12 keys; c.xml is the copy moved to C."""
+    labels = {}
+    for line in open(os.path.join(os.path.dirname(__file__), "cmd_genres.txt")):
+        if line.strip() and not line.startswith("#"):
+            g, *names = line.split()
+            labels.update({n: g for n in names})
+    out = []
+    for d in sorted(glob.glob(f"{RAW}/cmd/*/")):
+        name = os.path.basename(d.rstrip("/"))
+        if not os.path.exists(f"{d}c.xml"):
+            continue
+        try:
+            s = leadsheet(f"{d}c.xml", labels.get(name, "jazz"), f"cmd/{name}", tonic=0)
+        except Exception:
+            s = None
+        if s:
+            out.append(s)
+    return out
+
+
 # ---------- Classical ----------
 def classical():
     from music21 import corpus, chord as m21chord
@@ -319,6 +451,99 @@ def classical():
             if song:
                 out.append(song)
     log("classical bach", n_bach, "quartets", len(out) - n_bach)
+    return out
+
+
+# ---------- Classical with expert chord labels (DCML corpora) ----------
+DCML_TYPE = {"M": "maj", "m": "min", "o": "dim", "+": "aug", "Mm7": "7", "mm7": "min7", "MM7": "maj7", "mM7": "min",
+             "%7": "hdim7", "o7": "dim", "+7": "aug", "+M7": "aug", "Ger": "7", "It": "7", "Fr": "7"}
+SCALES = {False: [0, 2, 4, 5, 7, 9, 11], True: [0, 2, 3, 5, 7, 8, 10]}
+ROMAN = {"i": 0, "ii": 1, "iii": 2, "iv": 3, "v": 4, "vi": 5, "vii": 6}
+
+
+def roman_key(numeral, minor):
+    """'vi/V' in a major (minor=False) key -> (semitones above the tonic, is the new key minor)."""
+    off = 0
+    for part in reversed(numeral.split("/")):
+        m = re.match(r"^([#b]*)([ivIV]+)$", part)
+        if not m:
+            return None
+        acc, deg = m.groups()
+        off += SCALES[minor][ROMAN[deg.lower()]] + acc.count("#") - acc.count("b")
+        minor = deg.islower()
+    return off % 12, minor
+
+
+def frac(x):
+    from fractions import Fraction
+    return float(Fraction(x)) if x not in ("", None) else None
+
+
+def dcml_piece(base, piece, corpus):
+    import csv
+    read = lambda kind: list(csv.DictReader(open(f"{base}/{kind}/{piece}.{kind}.tsv", encoding="utf8"), delimiter="\t"))
+    measures = read("measures")
+    if not measures or any(m["timesig"] not in ("4/4", "2/4", "2/2") for m in measures):
+        return None
+    num, den = map(int, measures[0]["timesig"].split("/"))
+    bar = num * 4 / den
+    first = frac(measures[0]["duration_qb"])
+    pad = bar - first if first < bar else 0      # pickup bar: shift so downbeats land on beat one
+    notes = []
+    for r in read("notes"):
+        on = frac(r["quarterbeats"])
+        if on is None or r["staff"] != "1" or r.get("gracenote"):
+            continue
+        on6, dur6, p = int(round((on + pad) * 4)), int(round(frac(r["duration_qb"]) * 4)), int(r["midi"])
+        if r.get("tied") in ("0", "-1"):     # continues a tied note
+            for n in reversed(notes[-4:]):
+                if n[2] == p:
+                    n[1] = on6 + dur6 - n[0]
+                    break
+            continue
+        if notes and notes[-1][0] == on6:
+            if p > notes[-1][2]:
+                notes[-1] = [on6, max(1, dur6), p]
+            continue
+        notes.append([on6, max(1, dur6), p])
+    chords, gkey = [], None
+    for r in read("harmonies"):
+        on = frac(r["quarterbeats"])
+        if on is None or not r["globalkey"] or r["chord_type"] not in DCML_TYPE or r["root"] in ("", None):
+            continue
+        g = r["globalkey"]
+        if gkey is None:
+            gkey = (pc_of(g[0].upper() + g[1:].replace("#", "#").replace("b", "b")), g[0].islower())
+        lk = roman_key(r["localkey"], gkey[1])
+        if lk is None:
+            continue
+        root = (gkey[0] + lk[0] + int(float(r["root"])) * 7) % 12
+        ch = (root, QUALITIES.index(DCML_TYPE[r["chord_type"]]))
+        on6 = int(round((on + pad) * 4))
+        if chords and chords[-1][0] == on6:
+            chords[-1][2] = ch
+        elif not chords or chords[-1][2] != ch:
+            chords.append([on6, None, ch])
+    if gkey is None or len(chords) < 4 or not notes:
+        return None
+    steps = max(n[0] + n[1] for n in notes) // 16 * 16
+    for i in range(len(chords)):
+        chords[i][1] = chords[i + 1][0] if i + 1 < len(chords) else steps
+    return finalize([tuple(n) for n in notes], [tuple(c) for c in chords], gkey[0], gkey[1], steps, "classical", f"dcml/{corpus}/{piece}")
+
+
+def dcml():
+    out = []
+    for base in sorted(glob.glob(f"{RAW}/dcml/*")):
+        corpus = os.path.basename(base)
+        for f in sorted(glob.glob(f"{base}/harmonies/*.harmonies.tsv")):
+            piece = os.path.basename(f)[:-len(".harmonies.tsv")]
+            try:
+                s = dcml_piece(base, piece, corpus)
+            except (OSError, ValueError, KeyError):
+                s = None
+            if s:
+                out.append(s)
     return out
 
 
@@ -389,7 +614,7 @@ def jazz_chord(sym):
 
 
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["pop909", "cocopops", "nottingham", "classical", "wjazzd"]
+    which = sys.argv[1:] or ["pop909", "cocopops", "nottingham", "classical", "dcml", "wjazzd", "openewld", "chord_melody"]
     songs = []
     for name in which:
         got = [fix_mode(s) for s in globals()[name]()]

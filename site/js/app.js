@@ -262,7 +262,7 @@ function setTab(tab) {
 }
 
 const FACTS = [
-  ["2,145", "songs and jazz solos the melody model learned from, in 5 genres"],
+  ["3,307", "songs and jazz solos the melody model learned from, in 5 genres"],
   ["1,098", "jazz standards it learned chord changes from"],
   ["5,521", "descriptions by musicians the reader learned from"],
   [INSTRUMENTS.length, "instruments to choose from, no vocals"],

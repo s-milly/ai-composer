@@ -1,12 +1,13 @@
 """Train the chord model: given the genre, major or minor, the position in an eight-bar phrase and
 the chord before, it predicts the next chord, one chord per half bar. Pop, rock, folk and
 classical progressions come from data/songs.pkl; jazz progressions come from the iReal Pro
-lead sheets of about 1,200 standards in the parkR package. Exports site/chords.*."""
-import pickle, re, sys, time
+lead sheets of about 1,200 standards in the parkR package; 830 more pop progressions come from the
+McGill Billboard chord charts. Exports site/chords.*."""
+import glob, pickle, re, sys, time
 import numpy as np, pyreadr, torch
 from torch import nn
 from nets import EmbedGRU, export
-from songdata import GENRES, QUALITIES, NO_CHORD, pc_of
+from songdata import GENRES, QUALITIES, NO_CHORD, pc_of, harte
 
 torch.manual_seed(0); rng = np.random.default_rng(1); torch.set_num_threads(int(sys.argv[2]) if len(sys.argv) > 2 else 4)
 EPOCHS = int(sys.argv[1]) if len(sys.argv) > 1 else 20
@@ -58,6 +59,55 @@ for _, g in irb[irb.time == "4/4"].groupby("id", sort=False):
         # standards usually repeat their chorus; two passes give the model the turnaround
         seqs.append(("jazz", int(minor), np.array(half + half)))
         n_jazz += 1
+
+
+def billboard(path):
+    """McGill Billboard salami_chords.txt: '| A:min | A:min C:maj |' bars, '.' repeats a chord, 'xN' repeats a line."""
+    text = open(path, encoding="utf8", errors="ignore").read()
+    tonic = re.search(r"^# tonic: (\S+)", text, re.M)
+    if not re.search(r"^# metre: 4/4", text, re.M) or re.search(r"^# metre: (?!4/4)", text, re.M) or not tonic:
+        return None
+    try:
+        shift = -pc_of(tonic.group(1))
+    except KeyError:
+        return None
+    half, last = [], None
+    for line in text.splitlines():
+        bars = re.findall(r"\|([^|]*)(?=\|)", line)
+        rep = re.search(r"\|\s*x(\d+)", line)
+        row = []
+        for b in bars:
+            toks = [t for t in b.split() if not t.startswith("(")]
+            chs = []
+            for t in toks:
+                if t == ".":
+                    chs.append(last)
+                    continue
+                h = harte(t)
+                chs.append(h if t not in ("N", "&pause") else None)
+                last = chs[-1]
+            if not chs:
+                continue
+            pair = [chs[0], chs[len(chs) // 2]]
+            row += [NONE if c is None else tok((c[0] + shift) % 12, c[1]) for c in pair]
+        half += row * (int(rep.group(1)) if rep else 1)
+    if len(half) < 32:
+        return None
+    half = np.array(half)
+    roots, quals = np.where(half == NONE, -1, half // NQ), half % NQ
+    home = roots == 0
+    minor = home.sum() >= 4 and np.isin(quals[home], [QUALITIES.index("min"), QUALITIES.index("min7")]).mean() > 0.5
+    if minor:   # move minor songs to A like every other minor song
+        half = np.where(half == NONE, NONE, ((roots - 3) % 12) * NQ + quals)
+    return ("pop", int(minor), half)
+
+
+n_bb = 0
+for f in sorted(glob.glob("data/raw/billboard/*/salami_chords.txt")):
+    got = billboard(f)
+    if got:
+        seqs.append(got); n_bb += 1
+print("billboard progressions", n_bb, flush=True)
 print("songs per genre", {g: sum(1 for s in seqs if s[0] == g) for g in GENRES}, flush=True)
 
 FEATS = {"proot": 13, "pqual": NQ, "slot": 16, "genre": len(GENRES), "mode": 2}
