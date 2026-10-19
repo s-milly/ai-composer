@@ -65,16 +65,20 @@
       </form>
 
       <div class="heard" id="heard" hidden>
-        <p class="label" style="margin:0">What the AI heard</p>
-        <ul class="heard-list" id="heard-list"></ul>
-        <p class="note" id="heard-notes"></p>
         <div class="actions">
           <button class="btn btn--small" id="again" type="button">New song</button>
           <button class="btn btn--small" id="reharm" type="button" title="Keep the chords and write a new melody over them">New melody</button>
           <button class="btn btn--small" id="to-maker" type="button">Edit in the Song Maker</button>
           <button class="btn btn--small" id="midi" type="button">Download MIDI</button>
         </div>
-        <details class="adjust" id="adjust">
+        <details class="fold" id="heard-more">
+          <summary>What the AI heard</summary>
+          <div class="fold-body">
+            <ul class="heard-list" id="heard-list"></ul>
+            <p class="note" id="heard-notes"></p>
+          </div>
+        </details>
+        <details class="fold adjust" id="adjust">
           <summary>Change the settings</summary>
           <div class="adjust-grid">
             <div class="field"><span class="lab"><label for="a-style">Style</label></span><select id="a-style"></select></div>
