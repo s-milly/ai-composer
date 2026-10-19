@@ -17,7 +17,6 @@ const EXAMPLES = [
   "Epic movie music for a big battle",
   "A gentle lullaby with a harp and a music box",
   "A happy campfire song with guitar and harmonica",
-  "Spooky Halloween music",
   "An upbeat dance song for a party",
 ];
 // Keys each style tends to sit well in (major-key tonic or minor-key tonic).
