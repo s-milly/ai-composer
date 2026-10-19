@@ -1,4 +1,4 @@
-// Plays songs: sampled instruments (FluidR3 soundfont, one recording every third note, shifted to
+// Plays songs: sampled instruments (FatBoy soundfont, one recording every third note, shifted to
 // the exact pitch), drums made from scratch with oscillators and noise, and a light room reverb.
 import { INST, GUITARS } from "./catalog.js";
 
