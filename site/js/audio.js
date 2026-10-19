@@ -1,6 +1,6 @@
 // Plays songs: sampled instruments (FluidR3 soundfont, one recording every third note, shifted to
 // the exact pitch), drums made from scratch with oscillators and noise, and a light room reverb.
-import { INST } from "./catalog.js";
+import { INST, GUITARS } from "./catalog.js";
 
 let ac = null, master = null, wet = null, noise = null;
 const banks = {};  // instrument id -> Promise of { midi: AudioBuffer }
@@ -102,6 +102,32 @@ export function timeOf(song, s) {
 
 let live = [], playing = null;
 
+// Players are never perfectly together. A guitarist strums a chord one string after another
+// (down from the low string on the beat, back up from the high string between beats), a harpist
+// rolls it, a pianist's fingers land a few milliseconds apart, and every note varies a little in
+// timing and strength. dt is the shift in seconds.
+function humanize(part) {
+  const id = part.inst, strum = GUITARS.has(id), harp = id === "orchestral_harp";
+  const jitter = INST[id].decays ? 0.006 : 0.01, out = [];
+  const byStep = new Map();
+  for (const n of part.notes) { if (!byStep.has(n.s)) byStep.set(n.s, []); byStep.get(n.s).push(n); }
+  for (const [s, chord] of byStep) {
+    const lead = (Math.random() - 0.5) * jitter;
+    chord.sort((a, b) => a.p - b.p);
+    const up = strum && s % 4 === 2 && chord.length > 2;
+    const order = up ? chord.slice().reverse() : chord;
+    const gap = strum ? (up ? 0.009 : 0.014) * (0.8 + Math.random() * 0.4) : harp ? 0.028 : 0;
+    order.forEach((n, i) => {
+      const spread = chord.length > 1 && !gap ? Math.random() * 0.007 : 0;
+      const dt = Math.max(-0.008, lead + i * gap + spread);
+      // an upstroke catches the top strings harder than the bottom ones
+      const v = (n.v ?? 0.8) * (0.93 + Math.random() * 0.12) * (up ? 0.86 : 1) * (strum && i > 0 ? 1 - i * 0.025 : 1);
+      out.push({ ...n, dt, v });
+    });
+  }
+  return out;
+}
+
 export async function play(song, onStatus = () => {}) {
   const ctx = context();
   if (ctx.state === "suspended") await ctx.resume();
@@ -115,11 +141,11 @@ export async function play(song, onStatus = () => {}) {
   for (const part of song.parts) {
     if (!INST[part.inst]) continue;
     const out = bus(level); live.push(out);
-    for (const n of part.notes) {
-      const on = t0 + timeOf(song, n.s);
+    for (const n of humanize(part)) {
+      const on = t0 + timeOf(song, n.s) + n.dt;
       // the last chord rings a little longer
       const dur = n.l * six * (n.s + n.l >= song.steps ? 1.6 : 1);
-      live.push(sampleNote(loaded[part.inst], part.inst, n.p, on, dur, n.v ?? 0.8, out));
+      live.push(sampleNote(loaded[part.inst], part.inst, n.p, on, dur, n.v, out));
     }
   }
   if (song.drums.hits.length) {

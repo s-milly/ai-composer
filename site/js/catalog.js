@@ -81,7 +81,7 @@ export const STYLES = {
 export const CHORDAL = new Set(["acoustic_grand_piano", "electric_piano_1", "harpsichord", "celesta", "church_organ", "accordion",
   "music_box", "vibraphone", "marimba", "acoustic_guitar_nylon", "acoustic_guitar_steel", "electric_guitar_clean",
   "overdriven_guitar", "banjo", "orchestral_harp", "string_ensemble_1", "tremolo_strings", "pizzicato_strings", "brass_section", "pad_2_warm"]);
-const GUITARS = new Set(["acoustic_guitar_nylon", "acoustic_guitar_steel", "electric_guitar_clean", "overdriven_guitar", "banjo"]);
+export const GUITARS = new Set(["acoustic_guitar_nylon", "acoustic_guitar_steel", "electric_guitar_clean", "overdriven_guitar", "banjo"]);
 // How a lone chord instrument accompanies itself in each style: [chords, bass line].
 export function soloPlay(style, id) {
   const gentle = ["classical", "ballad", "cinematic", "lullaby", "spooky"].includes(style);
