@@ -1,4 +1,4 @@
-"""Download instrument recordings (the FatBoy General MIDI soundfont, CC BY-SA 3.0, rendered by
+"""Download instrument recordings (the Musyng Kite General MIDI soundfont, CC BY-SA 3.0, rendered by
 gleitz/midi-js-soundfonts) every third semitone. The page shifts the nearest one by at most one
 semitone to play any note. No vocal instruments are included.
 
@@ -10,7 +10,8 @@ note, pitch-shifted the way the page would. GAIN_DB evens out how loud each inst
 matched to the levels the band was first balanced with."""
 import base64, os, re, subprocess, sys, time, urllib.request
 
-BASE = "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/FatBoy"
+FONT = "MusyngKite"
+BASE = f"https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/{FONT}"
 NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
 INSTRUMENTS = ["acoustic_grand_piano", "electric_piano_1", "harpsichord", "church_organ", "marimba", "vibraphone",
                "acoustic_guitar_nylon", "orchestral_harp", "violin", "viola", "cello", "contrabass",
@@ -21,21 +22,21 @@ INSTRUMENTS = ["acoustic_grand_piano", "electric_piano_1", "harpsichord", "churc
                "xylophone", "glockenspiel", "steel_drums", "harmonica", "accordion", "brass_section", "timpani",
                "tremolo_strings", "tenor_sax"]
 NOTES = list(range(31, 91, 3))  # G1 to Gb6 covers every voice after transposing to any key
-GAIN_DB = {"acoustic_grand_piano": 2.1, "electric_piano_1": 3.4, "harpsichord": 6.6, "church_organ": 7.9, 
-           "marimba": 2.7, "vibraphone": 7.1, "acoustic_guitar_nylon": 4.7, "orchestral_harp": 2.6, 
-           "violin": 8.0, "viola": 5.0, "cello": 4.5, "contrabass": -3.0, "string_ensemble_1": 6.0, 
-           "pizzicato_strings": 7.2, "flute": 2.0, "oboe": 9.2, "clarinet": 3.0, "bassoon": 5.8, 
-           "trumpet": 6.1, "french_horn": 6.6, "trombone": 12.8, "tuba": 8.8, "acoustic_bass": 8.7, 
-           "alto_sax": 8.0, "electric_guitar_clean": 3.2, "overdriven_guitar": 6.1, 
-           "acoustic_guitar_steel": 1.8, "banjo": -0.2, "electric_bass_finger": 6.1, "electric_bass_pick": 6.8, 
-           "synth_bass_1": 2.3, "lead_2_sawtooth": 0.6, "pad_2_warm": 3.8, "music_box": 3.6, "celesta": -0.0, 
-           "xylophone": 3.2, "glockenspiel": 9.0, "steel_drums": 6.6, "harmonica": 3.7, "accordion": -0.6, 
-           "brass_section": 5.6, "timpani": 2.5, "tremolo_strings": 2.4, "tenor_sax": 3.9}
-CACHE = sys.argv[1] if len(sys.argv) > 1 else "data/raw/fatboy"
+GAIN_DB = {"acoustic_grand_piano": 3.1, "electric_piano_1": -0.0, "harpsichord": 3.2, "church_organ": -0.4, 
+           "marimba": 1.7, "vibraphone": 2.7, "acoustic_guitar_nylon": 3.2, "orchestral_harp": 2.6, 
+           "violin": 10.5, "viola": 5.5, "cello": 1.1, "contrabass": -3.8, "string_ensemble_1": -4.7, 
+           "pizzicato_strings": 9.2, "flute": 3.6, "oboe": 7.6, "clarinet": 3.1, "bassoon": 4.5, 
+           "trumpet": 2.8, "french_horn": 6.3, "trombone": 9.2, "tuba": 1.7, "acoustic_bass": 2.2, 
+           "alto_sax": 4.7, "electric_guitar_clean": 4.7, "overdriven_guitar": 3.5, 
+           "acoustic_guitar_steel": 1.9, "banjo": 0.3, "electric_bass_finger": -5.8, "electric_bass_pick": 6.4, 
+           "synth_bass_1": 0.9, "lead_2_sawtooth": 2.8, "pad_2_warm": -5.6, "music_box": 3.7, "celesta": 1.2, 
+           "xylophone": -5.4, "glockenspiel": 4.7, "steel_drums": 3.1, "harmonica": 2.0, "accordion": 6.0, 
+           "brass_section": 4.3, "timpani": -9.3, "tremolo_strings": 0.2, "tenor_sax": 2.8}
+CACHE = sys.argv[1] if len(sys.argv) > 1 else "data/raw/musyngkite"
 
 
 def fetch(inst):
-    """The FatBoy mp3 for every note we keep, saved as CACHE/inst_midi.mp3."""
+    """The soundfont mp3 for every note we keep, saved as CACHE/inst_midi.mp3."""
     os.makedirs(CACHE, exist_ok=True)
     if all(os.path.exists(f"{CACHE}/{inst}_{m}.mp3") for m in NOTES):
         return
