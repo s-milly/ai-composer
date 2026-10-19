@@ -2,7 +2,7 @@
 // instrument, two accompaniment parts built from the chords (held pads, arpeggios, strums,
 // stabs, power chords, jazz comping...) and a bass line. These are fixed playing patterns, one set
 // per style; the chords and melody they play come from the models.
-import { STYLES, BEATS } from "./catalog.js";
+import { STYLES, BEATS, CHORDAL, soloPlay } from "./catalog.js";
 
 const SHAPES = { maj: [0, 4, 7], min: [0, 3, 7], "7": [0, 4, 7, 10], maj7: [0, 4, 7, 11], min7: [0, 3, 7, 10],
   dim: [0, 3, 6], hdim7: [0, 3, 6, 10], sus: [0, 5, 7], aug: [0, 4, 8] };
@@ -39,7 +39,7 @@ export function melodyNotes(mel, shift) {
   return out;
 }
 
-export function arrange(written, { style, band, drums, tempo, key, minor }) {
+export function arrange(written, { style, band, drums, tempo, key, minor, only = false }) {
   const S = STYLES[style], shift = shiftFor(key, minor);
   const steps = written.melody.length, bars = steps / 16, finalBar = (bars - 1) * 16;
   const slots = written.chords.map(c => {
@@ -58,9 +58,14 @@ export function arrange(written, { style, band, drums, tempo, key, minor }) {
 
   const melody = melodyNotes(written.melody, shift);
   const parts = [{ inst: band[0], notes: melody }];
-  for (const [v, kind] of [[1, S.play[1]], [2, S.play[2]], [3, S.play[3]]]) {
+  for (const v of [1, 2, 3]) {
+    // in a song for only a few instruments, a piano or guitar covers the chords and bass in its own way
+    const self = only && v >= 2 && CHORDAL.has(band[v]);
+    const kind = self ? soloPlay(style, band[v])[v - 2] : S.play[v];
+    // the same instrument playing its own accompaniment keeps it under the tune
+    const soft = self && band[v] === band[0] ? 0.82 : 1;
     const notes = [];
-    const add = (p, s, l, vel) => { if (p && s < steps) notes.push({ p, s, l: Math.max(1, Math.min(l, steps - s)), v: vel }); };
+    const add = (p, s, l, vel) => { if (p && s < steps) notes.push({ p, s, l: Math.max(1, Math.min(l, steps - s)), v: vel * soft }); };
     const voicing = s => (v === 1 ? at(s).hi : at(s).lo);
     for (let s = 0; s < finalBar; s += 8) {
       const c = at(s), V = voicing(s), B = c.bass, barPos = s % 16;
@@ -123,7 +128,7 @@ export function arrange(written, { style, band, drums, tempo, key, minor }) {
     parts.push({ inst: band[v], notes: notes.sort((a, b) => a.s - b.s || a.p - b.p) });
   }
   return {
-    steps, bars, tempo, key, minor, style, swing: S.swing || 0, parts,
+    steps, bars, tempo, key, minor, style, swing: S.swing || 0, parts, only,
     drums: { beat: drums, hits: drums ? drumHits(drums, steps, finalBar) : [] },
     written,
   };

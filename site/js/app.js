@@ -62,15 +62,18 @@ function playButton(on) {
 function refreshPlayable() { $("play").disabled = !hasNotes(currentSong()); }
 
 /* ---------- Stage ---------- */
-function showBand(band, drums) {
-  setBand(band, drums);
-  $("stage-legend").innerHTML = band.map((id, v) => `<li><span class="sw" style="background:${PARTS[v].color}"></span>${PARTS[v].name}: ${INST[id] ? INST[id].name : "off"}</li>`).join("")
+function showBand(band, drums, only = false) {
+  setBand(band, drums, only);
+  const playing = [...new Set(band.filter(id => INST[id]))];
+  $("stage-legend").innerHTML = (only
+    ? playing.map(id => `<li><span class="sw" style="background:${PARTS[band.indexOf(id)].color}"></span>${playing.length === 1 && !drums ? "Solo" : PARTS[band.indexOf(id)].name}: ${INST[id].name}</li>`).join("")
+    : band.map((id, v) => `<li><span class="sw" style="background:${PARTS[v].color}"></span>${PARTS[v].name}: ${INST[id] ? INST[id].name : "off"}</li>`).join(""))
     + (drums ? `<li><span class="sw" style="background:${DRUM_PART.color}"></span>Drums</li>` : "");
 }
 function stageForTab() {
   if (state.tab === "ai") {
     const s = state.ai ? state.ai.settings : null;
-    showBand(s ? s.band : STYLES.classical.band, s ? !!s.drums : false);
+    showBand(s ? s.band : STYLES.classical.band, s ? !!s.drums : false, s ? s.only : false);
   } else showBand(mk.parts.map(p => p.inst), mk.drums.hits.length > 0);
 }
 function pickPlayer(v) {
@@ -90,7 +93,7 @@ async function composeFrom(text) {
   state.read = r;
   const style = r.style.value;
   const settings = { style, minor: r.minor, key: r.key ?? pickKey(style), bars: state.length || r.bars, tempo: r.tempo, creativity: r.creativity,
-    band: r.band, drums: r.drums, speed: r.speed.value };
+    band: r.band, drums: r.drums, speed: r.speed.value, only: r.only };
   await runCompose(settings, null);
 }
 
@@ -119,8 +122,8 @@ async function runCompose(settings, keepChords) {
 
 function rebuild() {
   const { settings: s, written } = state.ai;
-  state.ai.song = arrange(written, { style: s.style, band: s.band, drums: s.drums, tempo: s.tempo, key: s.key, minor: s.minor });
-  showBand(s.band, !!s.drums);
+  state.ai.song = arrange(written, { style: s.style, band: s.band, drums: s.drums, tempo: s.tempo, key: s.key, minor: s.minor, only: s.only });
+  showBand(s.band, !!s.drums, s.only);
   drawRoll($("roll"), $("roll-scroll"), state.ai.song);
   $("roll-title").textContent = `The notes · ${KEYS[s.key]} ${s.minor ? "minor" : "major"} · ${s.bars} bars`;
   $("roll-key").innerHTML = PARTS.map((p, v) => `<li><span class="sw" style="background:${p.color};opacity:${INST[s.band[v]] ? 1 : 0.25}"></span>${p.name}</li>`).join("");
@@ -153,8 +156,12 @@ function renderHeard() {
     ["Speed", `${{ slow: "Slow", medium: "Medium", fast: "Fast" }[r.speed.value]} · ${s.tempo} bpm`, why(r.speed)],
     ["Length", `${s.bars} bars · about ${secs} seconds`, state.length ? "You picked it" : r.lengthHow === "said" ? "From your description" : "The usual length; pick another above"],
   ];
-  const bandText = s.band.map(id => (INST[id] ? INST[id].name : "off")).join(" · ") + (s.drums ? ` · ${BEAT_NAMES[s.drums]} drums` : "");
-  const bandWhy = r.named.length ? `You named ${list(r.named.map(id => INST[id].name.toLowerCase()))}` : `The usual ${S.name.toLowerCase()} band`;
+  const playing = [...new Set(s.band.filter(id => INST[id]))];
+  const bandText = s.only
+    ? (playing.length === 1 && !s.drums ? `${INST[playing[0]].name} alone` : playing.map(id => INST[id].name).join(" · ") + (s.drums ? ` · ${BEAT_NAMES[s.drums]} drums` : ""))
+    : s.band.map(id => (INST[id] ? INST[id].name : "off")).join(" · ") + (s.drums ? ` · ${BEAT_NAMES[s.drums]} drums` : "");
+  const bandWhy = s.only ? `You asked for only ${list(r.named.map(id => INST[id].name.toLowerCase()))}`
+    : r.named.length ? `You named ${list(r.named.map(id => INST[id].name.toLowerCase()))}` : `The usual ${S.name.toLowerCase()} band`;
   $("heard-list").innerHTML = items.map(([k, v, w]) => `<li><span class="k">${k}</span><span class="v">${v}</span><span class="why">${w}</span></li>`).join("")
     + `<li style="grid-column:1/-1"><span class="k">Band</span><span class="band-v">${bandText}</span><span class="why">${bandWhy}. Select a player on stage to change it.</span></li>`;
   $("heard-notes").textContent = r.notes.join(" ");
@@ -181,7 +188,7 @@ function mountAdjust() {
   const s = () => state.ai.settings;
   $("a-style").addEventListener("change", e => {
     const st = STYLES[e.target.value];
-    Object.assign(s(), { style: e.target.value, band: st.band.slice(), drums: st.drums, tempo: st.tempo[["slow", "medium", "fast"].indexOf(s().speed)] });
+    Object.assign(s(), { style: e.target.value, band: st.band.slice(), drums: st.drums, only: false, tempo: st.tempo[["slow", "medium", "fast"].indexOf(s().speed)] });
     syncAdjust(); rearrange();
   });
   $("a-drums").addEventListener("change", e => { s().drums = e.target.value || null; rearrange(); });
@@ -189,7 +196,13 @@ function mountAdjust() {
   $("a-tempo").addEventListener("input", e => { s().tempo = +e.target.value; $("a-tempo-out").textContent = `${s().tempo} bpm`; });
   $("a-tempo").addEventListener("change", () => rearrange());
   $("a-temp").addEventListener("input", e => { s().creativity = +e.target.value; $("a-temp-out").textContent = (+e.target.value).toFixed(2); });
-  $("a-band").addEventListener("change", e => { s().band[+e.target.dataset.v] = e.target.value; rearrange(); });
+  $("a-band").addEventListener("change", e => {
+    const v = +e.target.dataset.v, was = s().band[v];
+    // a lone piano plays several parts; swapping it out swaps all of them
+    if (s().only && INST[was]) s().band = s().band.map(id => (id === was ? e.target.value : id));
+    else s().band[v] = e.target.value;
+    syncAdjust(); rearrange();
+  });
   const seg = (id, fn) => $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; fn(+b.dataset.v); syncAdjust(); });
   seg("a-mode", v => (s().minor = !!v));
 }

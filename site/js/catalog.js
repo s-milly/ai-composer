@@ -76,6 +76,21 @@ export const STYLES = {
   spooky: { name: "Spooky", genre: "classical", dens: -1, band: ["celesta", "church_organ", "pizzicato_strings", "contrabass"],
     play: ["melody", "pad", "arp", "root"], drums: null, tempo: [56, 72, 92], swing: 0, minor: true },
 };
+// Instruments that can play chords and a bass line on their own, so a song for just one of them
+// still has harmony. Everything else plays only the tune when it is alone.
+export const CHORDAL = new Set(["acoustic_grand_piano", "electric_piano_1", "harpsichord", "celesta", "church_organ", "accordion",
+  "music_box", "vibraphone", "marimba", "acoustic_guitar_nylon", "acoustic_guitar_steel", "electric_guitar_clean",
+  "overdriven_guitar", "banjo", "orchestral_harp", "string_ensemble_1", "tremolo_strings", "pizzicato_strings", "brass_section", "pad_2_warm"]);
+const GUITARS = new Set(["acoustic_guitar_nylon", "acoustic_guitar_steel", "electric_guitar_clean", "overdriven_guitar", "banjo"]);
+// How a lone chord instrument accompanies itself in each style: [chords, bass line].
+export function soloPlay(style, id) {
+  const gentle = ["classical", "ballad", "cinematic", "lullaby", "spooky"].includes(style);
+  if (style === "jazz") return ["comp", "walk"];
+  if (GUITARS.has(id)) return [gentle ? "pick" : "strum", gentle ? "root" : "rootfifth"];
+  if (style === "march") return ["pah", "oom"];
+  if (gentle) return ["arp", "root"];
+  return [style === "folk" ? "pah" : "stab", "rootfifth"];
+}
 export const STYLE_ORDER = ["classical", "ballad", "pop", "rock", "jazz", "folk", "march", "cinematic", "lullaby", "spooky"];
 
 export const KEYS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];

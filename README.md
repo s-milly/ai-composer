@@ -24,7 +24,7 @@ Live page: https://s-milly.github.io/music-composer/
 
 **Song writer** (`site/js/writer.js`): songs of 8 to 32 bars (picked on the page, or read from the description, like "a one minute song"). Phrases follow forms like A A' B A'; 24 and 32 bar songs add a chorus, and 32 bar songs play the verse and chorus twice. The answering phrase repeats the first three bars and comes home, and the song ends on the home note.
 
-**Band** (`site/js/arrange.js`, `site/js/audio.js`, `site/js/stage.js`): each of the 10 styles sets the band, a speed range, a drum beat and how each part plays the chords (pads, arpeggios, stabs, power chords, strumming, fingerpicking, jazz comping over a walking bass, march oom-pah). Instruments are FluidR3 soundfont recordings (`scripts/fetch_samples.py`); drums are synthesized in the browser.
+**Band** (`site/js/arrange.js`, `site/js/audio.js`, `site/js/stage.js`): each of the 10 styles sets the band, a speed range, a drum beat and how each part plays the chords (pads, arpeggios, stabs, power chords, strumming, fingerpicking, jazz comping over a walking bass, march oom-pah). A description with "only", "just", "solo" or "by itself" plays only the instruments it names: a piano, guitar or harp covers its own chords and bass line, a flute or violin plays the tune alone, and there are no drums unless they are named. Instruments are FluidR3 soundfont recordings (`scripts/fetch_samples.py`); drums are synthesized in the browser.
 
 **Song Maker** (`site/js/maker.js`): a note grid for each part plus a drum grid, saved in the browser, with MIDI export (`site/js/midi.js`).
 

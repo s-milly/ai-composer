@@ -63,17 +63,31 @@ export function mountStage(el, pick) {
   svg.addEventListener("keydown", e => { const g = e.target.closest("[data-part]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPick(+g.dataset.part); } });
 }
 
-// band: four instrument ids (or "off"); drums: true when there is a drummer.
-export function setBand(band, drums) {
+// band: four instrument ids (or "off"); drums: true when there is a drummer. only: the song is for
+// just the instruments asked for, so empty chairs are left out and an instrument that plays several
+// parts (a solo piano plays the tune, the chords and the bass) stands on stage once.
+export function setBand(band, drums, only = false) {
   if (!svg) return;
   // on a phone the stage is drawn narrower, so the players come out bigger
   const narrow = svg.clientWidth > 0 && svg.clientWidth < 600;
   const W = narrow ? 620 : 1000, H = 440;
-  const players = band.map((id, v) => ({ v, id, part: PARTS[v] }));
-  if (drums) players.splice(2, 0, { v: 4, id: "drums", part: DRUM_PART });
+  let players = band.map((id, v) => ({ v, id, part: PARTS[v], parts: [v] }));
+  if (only) {
+    const seen = new Map();
+    players = players.filter(pl => {
+      if (!INST[pl.id]) return false;
+      if (seen.has(pl.id)) { seen.get(pl.id).parts.push(pl.v); return false; }
+      seen.set(pl.id, pl); return true;
+    });
+    for (const pl of players) {
+      const name = players.length === 1 && !drums ? "Solo" : pl.parts.length === 1 ? pl.part.name : pl.parts.includes(0) ? "Melody and chords" : "Chords and bass";
+      pl.part = { name, color: pl.part.color };
+    }
+  }
+  if (drums) players.splice(Math.min(2, players.length), 0, { v: 4, id: "drums", part: DRUM_PART, parts: [4] });
   const side = narrow ? 30 : 110, n = players.length, xs = players.map((_, i) => side + (i + 0.5) * ((W - 2 * side) / n));
   const spread = narrow ? 58 : 92, top = narrow ? 120 : 10;  // a phone shows less empty wall above the lamps
-  const key = JSON.stringify([band, drums, narrow]);
+  const key = JSON.stringify([band, drums, narrow, only]);
   if (key === layoutKey) return;
   layoutKey = key;
   let out = `<defs>
@@ -91,7 +105,7 @@ export function setBand(band, drums) {
     const x = xs[i], back = pl.v === 4, floor = back ? 336 : 384, size = (back ? 120 : 132) * (narrow ? 0.85 : 1);
     const icon = iconFor(pl.id), off = !icon;
     const label = off ? "Off" : pl.id === "drums" ? "Drum kit" : INST[pl.id].name;
-    out += `<g class="spot${off ? " off" : ""}" data-part="${pl.v}" style="--lit:0" tabindex="0" role="button" aria-label="${pl.part.name}: ${label}. Change instrument">
+    out += `<g class="spot${off ? " off" : ""}" data-part="${pl.v}" data-parts="${pl.parts.join(",")}" style="--lit:0" tabindex="0" role="button" aria-label="${pl.part.name}: ${label}. Change instrument">
       <rect class="lamp" x="${x - 13}" y="${top}" width="26" height="18" rx="4"/>
       <polygon class="beam" points="${x - 9},${top + 16} ${x + 9},${top + 16} ${x + spread},${floor} ${x - spread},${floor}" fill="url(#st-beam)"/>
       <ellipse class="pool" cx="${x}" cy="${floor}" rx="${spread + 8}" ry="22" fill="url(#st-pool)"/>
@@ -111,7 +125,7 @@ export function setBand(band, drums) {
 export function light(levels) {
   if (!svg) return;
   svg.querySelectorAll(".spot").forEach(g => {
-    const v = +g.dataset.part, l = levels ? levels[v] || 0 : 0;
+    const l = levels ? Math.max(...g.dataset.parts.split(",").map(v => levels[+v] || 0)) : 0;
     g.style.setProperty("--lit", l.toFixed(3));
   });
 }

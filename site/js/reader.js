@@ -6,7 +6,7 @@
 //  2. Everything else goes to a model trained on 5,521 MusicCaps descriptions written by
 //     musicians. It is a linear classifier on the average GloVe word vector, so its score for an
 //     answer is the average of per-word scores; reader.bin stores those scores for 38,427 words.
-import { STYLES, INST } from "./catalog.js";
+import { STYLES, INST, CHORDAL } from "./catalog.js";
 
 let R = null;
 
@@ -26,7 +26,7 @@ export const tokensOf = text => (text.toLowerCase().replace(/’/g, "'").match(T
 // Words that set something directly (length, key, tempo, solo) or say nothing about the music.
 // They are kept away from the model so they cannot tip its guesses.
 const FILLER = new Set(["song", "songs", "music", "track", "tune", "tunes", "piece", "bars", "bar", "measures", "bpm", "beats", "minute",
-  "major", "minor", "key", "sharp", "flat", "solo", "only", "just", "alone", "really", "very", "pretty", "kind", "sort", "like",
+  "major", "minor", "key", "sharp", "flat", "solo", "only", "just", "alone", "unaccompanied", "itself", "nothing", "really", "very", "pretty", "kind", "sort", "like",
   "something", "want", "make", "play", "write", "please", "maybe", "little", "lot", "bit", "sounds", "sounding", "feel", "feeling", "vibe", "vibes", "type",
   "minutes", "min", "mins", "seconds", "second", "sec", "secs", "short", "long", "longer", "brief", "extended", "full", "half"]);
 const usable = t => !R.stopSet.has(t) && R.index.has(t) && !FILLER.has(t) && !/^\d+$/.test(t) && t.length > 1;
@@ -211,15 +211,21 @@ export function readDescription(text) {
     const id = typeof entry === "function" ? entry(style) : entry;
     if (!named.includes(id)) named.push(id);
   }
-  const bassWord = findPhrases(toks, ["bass"]).some(h => !negated(toks, h.at));
   const bass = named.filter(id => BASS_ONLY.has(id)), others = named.filter(id => !BASS_ONLY.has(id));
-  if (bass.length) band[3] = bass[0];
-  if (others.length) {
-    const solo = toks.some(t => ["solo", "only", "just", "alone"].includes(t));
-    if (solo && others.length === 1) {
-      band[0] = band[1] = band[2] = others[0];
-      if (!bass.length && !bassWord) band[3] = others[0];
-    } else {
+  // "only a piano", "just piano", "piano solo", "harp by itself": play the named instruments and nobody else
+  const hits = findPhrases(toks, INSTRUMENT_WORDS.map(([w]) => w)).filter(h => !negated(toks, h.at));
+  const near = hits.some(h => [1, 2, 3].some(d => ["only", "just"].includes(toks[h.at - d])) || ["only", "alone"].includes(toks[h.at + h.len]));
+  const only = named.length > 0 && (near || toks.some(t => ["solo", "alone", "unaccompanied"].includes(t))
+    || /\b(by itself|on its own|nothing but|nothing else|and nothing more)\b/.test(toks.join(" ")));
+  if (only) {
+    const lead = others.find(id => LEADS.has(id)) || others[0] || bass[0];
+    const rest = others.filter(id => id !== lead), chordal = named.find(id => CHORDAL.has(id));
+    band[0] = lead; band[1] = rest[0] || "off"; band[2] = rest[1] || "off"; band[3] = bass.find(id => id !== lead) || "off";
+    // a piano, guitar or harp plays its own chords and bass line
+    if (chordal) { if (band[2] === "off") band[2] = chordal; if (band[3] === "off") band[3] = chordal; }
+  } else {
+    if (bass.length) band[3] = bass[0];
+    if (others.length) {
       const lead = others.find(id => LEADS.has(id)) || others[0];
       const rest = others.filter(id => id !== lead);
       band[0] = lead;
@@ -228,11 +234,12 @@ export function readDescription(text) {
   }
   out.band = band;
   out.named = named;
+  out.only = only;
 
   // drums
   const drumHits = findPhrases(toks, ["drums", "drum", "beat", "beats", "percussion", "drummer"]);
   const noDrums = drumHits.some(h => negated(toks, h.at));
-  out.drums = noDrums ? null : drumHits.length ? (S.drums || (style === "spooky" ? "cinematic" : "folk")) : S.drums;
+  out.drums = noDrums ? null : drumHits.length ? (S.drums || (style === "spooky" ? "cinematic" : "folk")) : only ? null : S.drums;
   // a slow movie score keeps its big drums out unless they were asked for
   if (!drumHits.length && style === "cinematic" && out.speed.value === "slow") out.drums = null;
   out.drumsHow = noDrums || drumHits.length ? "said" : "style";
