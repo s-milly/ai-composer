@@ -251,3 +251,10 @@ footer { font-size: 13px; color: var(--muted); }
   .tip { transition: none; }
   .spot .ico { transform: none; }
 }
+
+/* Top bar: back to the portfolio and a link to the code, same as Four Fronts */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: -32px; }
+.topbar .back { color: var(--ink-2); text-decoration: none; font-size: 15px; }
+.topbar .back:hover { color: var(--ink); }
+.topbar .source { font-size: 14px; font-weight: 500; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; white-space: nowrap; }
+.topbar .source:hover { border-color: var(--accent); color: var(--accent); }
